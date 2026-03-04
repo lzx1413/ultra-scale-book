@@ -135,19 +135,19 @@ So, we can now decrease the bubble by adding micro-batches and interleaved stage
 
 *[Open full interactive visualization: Pp Bubblesize](/ultra-scale-book/fragments/pp_bubblesize.html)*
 
-Scheduling also becomes more complex here, as we have to decide on a given GPU and at a given moment whether we are prioritizing earlier micro-batches going through later layers – meaning that we close the forward and backward loops as fast as possible (the “depth-first” approach, which prioritizes getting batches out of the model as fast as possible) – or later micro-batches going through earlier layers (the “breadth-first” approach, which prioritizes filling in the pipeline as much as possible). This choice is explained in detail in the "Breadth-Fist Pipeline Parallelism" paper[].
+Scheduling also becomes more complex here, as we have to decide on a given GPU and at a given moment whether we are prioritizing earlier micro-batches going through later layers – meaning that we close the forward and backward loops as fast as possible (the “depth-first” approach, which prioritizes getting batches out of the model as fast as possible) – or later micro-batches going through earlier layers (the “breadth-first” approach, which prioritizes filling in the pipeline as much as possible). This choice is explained in detail in the "Breadth-Fist Pipeline Parallelism" paper[^21].
 
 You now have all the elements to understand the pipeline parallelism approach in Llama 3.1, which uses a 1F1B setup with interleaved stages and a priority setting tunable between depth-first and breadth-first:
 
 ![pp_llama3.1_schedule.png](assets/images/pp_llama3.1_schedule.png)
 
-However, we haven’t reached the end of the possible pipeline schedules, and recently some methods have been proposed to **reduce the bubble to virtually zero**! These techniques were, for instance, used in the DeepSeek-V3/R1 implementation[]. Piqued your curiosity? Let’s have a final quick look at these magical schedules before we leave the world of pipeline parallelism!
+However, we haven’t reached the end of the possible pipeline schedules, and recently some methods have been proposed to **reduce the bubble to virtually zero**! These techniques were, for instance, used in the DeepSeek-V3/R1 implementation[^22]. Piqued your curiosity? Let’s have a final quick look at these magical schedules before we leave the world of pipeline parallelism!
 
 ### Zero bubble and DualPipe
 
 Even more sophisticated ways to reduce the bubble have recently been proposed that reach close to a “zero bubble” regime, such as the pipeline implementation approach in DeepSeek-V3/R1, called DualPipe. The secret here is to split the operations involved at an even finer-grained level in order to interleave them in the most efficient way.
 
-Let’s briefly see how this can work by summarizing Sea AI Lab's zero bubble work[], which is a precursor to DualPipe. The basic observation here is that the backward pass through a matrix multiplication actually involves two separate operations: the backward operation for the inputs ($B$) and the backward operation for the weights ($W$).
+Let’s briefly see how this can work by summarizing Sea AI Lab's zero bubble work[^23], which is a precursor to DualPipe. The basic observation here is that the backward pass through a matrix multiplication actually involves two separate operations: the backward operation for the inputs ($B$) and the backward operation for the weights ($W$).
 
 While the output of $B$, the backward pass for the inputs, is necessary for performing the backward pass of the lower layers, the backward pass of the weights, $W$, is not and generally only needs to be performed before the optimizer step. We can see that in the following diagram (from the Zero Bubble paper):
 
@@ -159,12 +159,18 @@ This means $W$ can be flexibly scheduled anywhere after the corresponding $B$ of
 
 On the top (Figure 2 from the Zero Bubble paper): the classical 1F1B schedule, interleaving forward and backward passes but keeping a coarse-grained backward pass. On the bottom (Figure 3 from the Zero Bubble paper): two handcrafted schedules splitting the backward pass into finer-grained $B$ and $W$ operations. The lower schedule is an example of a (theoretical) zero bubble schedule taking advantage of this fine-grained decomposition.
 
-DeepSeek’s DualPipe, introduced with its V3 technical report [], is an extension of this decomposed approach to the additional case of two streams propagating from both ends of the PP dimension, with these streams being interleaved to further minimize idle time in the GPUs. This schedule is displayed in the following scheduling graph - as you can see, it's even more complex than the previous ones:
+DeepSeek’s DualPipe, introduced with its V3 technical report [^24], is an extension of this decomposed approach to the additional case of two streams propagating from both ends of the PP dimension, with these streams being interleaved to further minimize idle time in the GPUs. This schedule is displayed in the following scheduling graph - as you can see, it's even more complex than the previous ones:
 
 ![image.png](assets/images/pp_zerobubble_dualpipe.png)
 
-In general, fully optimizing such complex schedules involves carefully measuring the duration of the various fine-grained operations and solving an Integer Linear Programming (ILP) problem to minimize the final bubble time. (See, for instance, the Zero Bubble paper[] for a discussion of the heuristics and algorithms used to perform such scheduling.) As a result, the zero bubble and DualPipe schedules are too complex for us to give code snippets here, but you should have a general idea of the concepts involved.
+In general, fully optimizing such complex schedules involves carefully measuring the duration of the various fine-grained operations and solving an Integer Linear Programming (ILP) problem to minimize the final bubble time. (See, for instance, the Zero Bubble paper[^25] for a discussion of the heuristics and algorithms used to perform such scheduling.) As a result, the zero bubble and DualPipe schedules are too complex for us to give code snippets here, but you should have a general idea of the concepts involved.
 
 This concludes our tour of the world of pipeline schedules and bubbles. We hope you enjoyed it!
 
 It's now time to turn to the last parallelism method we'll detail, which we can use to train large models efficiently: ***expert parallelism***.
+
+
+---
+
+## References
+

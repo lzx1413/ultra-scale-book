@@ -6,11 +6,11 @@
 
 This is the last parallelism method we're going to discuss. Before tackling it, if you don't have any exposure to Mixture of Experts (MoE) models, you might want to take some time to read about them in [this much shorter blog post](https://huggingface.co/blog/moe) we published some time ago, which should help you better understand the MoE architecture in general.
 
-The Mixture of Experts paradigm has recently gained traction and visibility with models such as GPT-4, Mixtral[], and DeepSeek-V3/R1. The basic idea is that instead of having a single feedforward module per layer, we can have several parallel modules and route tokens through them to be processed differently.
+The Mixture of Experts paradigm has recently gained traction and visibility with models such as GPT-4, Mixtral[^17], and DeepSeek-V3/R1. The basic idea is that instead of having a single feedforward module per layer, we can have several parallel modules and route tokens through them to be processed differently.
 
 ![ep_moe.png](assets/images/ep_moe.png)
 
-Illustration of an MoE layer taken from the Switch Transformers paper[]
+Illustration of an MoE layer taken from the Switch Transformers paper[^18]
 
 The design of MoE layers makes it easy to implement parallelism across the experts dimension, for what we call *expert parallelism (EP)*. Since the feedforward layers are fully independent, we can simply put each expert's feedforward layer on a different worker. Compared to TP, this approach is much more lightweight, since we don't need to split the matrix multiplication; we just need to route the hidden states of a token to the right expert.
 
@@ -18,10 +18,20 @@ In practice, EP is typically used in conjunction with other forms of parallelism
 
 ![ep_schema.png](assets/images/ep_schema.png)
 
-Source: "A Survey on Mixture of Experts"[]
+Source: "A Survey on Mixture of Experts"[^19]
 
 But let's not get ahead of ourselves - we'll talk about all the interactions between different parallelism strategies in the following section, so don't worry if you don't understand this last diagram yet.
 
-In practice, there are a few tricks to make EP work efficiently, and they are closely tied to model design. For instance, DeepSeek-V3 enforces a constraint in the router, ensuring that each token is sent to at most $M$ nodes (in their case, 4) to keep the tokens on a single node and reduce communication overhead. While expert parallelism has been around for a while[], it is just now gaining new traction with the MoE architecture gaining popularity.
+In practice, there are a few tricks to make EP work efficiently, and they are closely tied to model design. For instance, DeepSeek-V3 enforces a constraint in the router, ensuring that each token is sent to at most $M$ nodes (in their case, 4) to keep the tokens on a single node and reduce communication overhead. While expert parallelism has been around for a while[^20], it is just now gaining new traction with the MoE architecture gaining popularity.
 
 We plan to add a more complete example of EP in Picotron/Nanotron soon, so stay tuned for more!
+
+
+---
+
+## References
+
+[^17]: torchao maintainers and contributors. **torchao: PyTorch native quantization and sparsity for training and inference**. 2024. [Link](https://github.com/pytorch/ao). 
+
+[^18]: Mitchell Wortsman and Peter J. Liu and Lechao Xiao and Katie Everett and Alex Alemi and Ben Adlam and John D. Co-Reyes and Izzeddin Gur and Abhishek Kumar and Roman Novak and Jeffrey Pennington and Jascha Sohl-dickstein and Kelvin Xu and Jaehoon Lee and Justin Gilmer and Simon Kornblith. **Small-scale proxies for large-scale Transformer training instabilities**. 2023. [Link](https://arxiv.org/abs/2309.14322). [arXiv:2309.14322](https://arxiv.org/abs/2309.14322).
+

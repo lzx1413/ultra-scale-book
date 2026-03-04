@@ -1,0 +1,1398 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The ultimate guide to training LLM on large GPU Clusters">
+      
+      
+      
+        <link rel="canonical" href="https://lzx1413.github.io/ultra-scale-book/10_diving_into_gpus/">
+      
+      
+        <link rel="prev" href="../09_finding_best_training_configuration/">
+      
+      
+        <link rel="next" href="../11_conclusion/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>10. Diving into the GPUs - The Ultra-Scale Playbook</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#diving-into-the-gpus-fusing-threading-and-mixing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-header__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            The Ultra-Scale Playbook
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              10. Diving into the GPUs
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-nav__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    The Ultra-Scale Playbook
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_high_level_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. High-Level Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_first_steps_training_on_one_gpu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. First Steps: Training on One GPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_data_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Data Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_tensor_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Tensor Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_context_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Context Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06_pipeline_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Pipeline Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_expert_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Expert Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_5d_parallelism_in_a_nutshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. 5D Parallelism in a Nutshell
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09_finding_best_training_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Finding the Best Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Diving into the GPUs
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Diving into the GPUs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#diving-into-the-gpus-fusing-threading-and-mixing_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diving into the GPUs – Fusing, Threading, and Mixing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Diving into the GPUs – Fusing, Threading, and Mixing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-primer-on-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A primer on GPUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improving-performance-with-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improving performance with kernels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Improving performance with kernels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-coalescing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory coalescing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-coarsening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread coarsening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimizing-control-divergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimizing control divergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fused-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fused kernels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flashattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FlashAttention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-precision-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed precision training
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixed precision training">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fp16-and-bf16-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FP16 and BF16 training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fp8-pretraining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FP8 pretraining
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11_conclusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Conclusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12_references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. References
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13_appendix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Appendix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#diving-into-the-gpus-fusing-threading-and-mixing_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diving into the GPUs – Fusing, Threading, and Mixing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Diving into the GPUs – Fusing, Threading, and Mixing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-primer-on-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A primer on GPUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improving-performance-with-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improving performance with kernels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Improving performance with kernels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-coalescing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory coalescing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thread-coarsening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread coarsening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimizing-control-divergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimizing control divergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fused-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fused kernels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flashattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FlashAttention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-precision-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed precision training
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixed precision training">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fp16-and-bf16-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FP16 and BF16 training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fp8-pretraining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FP8 pretraining
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="diving-into-the-gpus-fusing-threading-and-mixing">Diving into the GPUs – Fusing, Threading, and Mixing<a class="headerlink" href="#diving-into-the-gpus-fusing-threading-and-mixing" title="Permanent link">&para;</a></h1>
+<p><em>From <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">The Ultra-Scale Playbook</a></em></p>
+<h2 id="diving-into-the-gpus-fusing-threading-and-mixing_1">Diving into the GPUs – Fusing, Threading, and Mixing<a class="headerlink" href="#diving-into-the-gpus-fusing-threading-and-mixing_1" title="Permanent link">&para;</a></h2>
+<p>To add a podcast feeling to your reading experience, feel free to listen to the NotebookLM hosts discussing the following sections of this book as you're reading along.</p>
+<p>Up to now, our discussion has been focused on the high-level organization of our model operations. We’ve moved computations around on various accelerators, taking into account general memory constraints and high-level scheduling of the compute units.</p>
+<p>But this ignored all the optimizations we can do at a much lower level by carefully understanding how our model operations are scheduled and performed on each GPU.</p>
+<p>This section will dig into the details of GPU architecture. We’ll focus on NVIDIA’s GPU architecture in particular, but the general ideas, as is often the case, can be reused on similar accelerator units.</p>
+<p>We’ll briefly explain how GPUs are organized before covering the FlashAttention revolution, how to efficiently schedule workloads on GPUs, and  how various precisions can be efficiently used on GPUs.</p>
+<h3 id="a-primer-on-gpus">A primer on GPUs<a class="headerlink" href="#a-primer-on-gpus" title="Permanent link">&para;</a></h3>
+<p>Generally, GPUs have a very hierarchical organization. On the compute side, a GPU consists of an array of compute units called <strong><em>streaming multiprocessors (SMs)</em></strong>. Each SM contains and controls a set of streaming processors, also known as <em>cores</em>. For example, an NVIDIA H100 GPU has 132 SMs with 128 cores per SM, resulting in a total of 16,896 cores (see <a href="https://resources.nvidia.com/en-us-tensor-core">the docs for tensor cores</a> for details), each capable of handling multiple threads simultaneously.</p>
+<p><img alt="image.png" src="../assets/images/diving_primergpu.svg" /></p>
+<p>Source: https://blog.codingconfessions.com/p/gpu-computing</p>
+<p>The memory side is also highly hierarchical, with several layers of cache and memory. <em>Registers</em> are the smallest units and are private to the threads during executions. <em>Shared memory</em> and the <em>L1 cache</em> are shared between the threads running on a single SM. Higher up is the <em>L2 cache</em> shared by all SMs, and finally there is the <em>global memory</em>, which is the largest memory on the GPU (the advertised 80 GB for an H100, for instance) but also the slowest to access and query.</p>
+<p><img alt="image.png" src="../assets/images/diving_primergpu2.svg" /></p>
+<p>Source: https://www.youtube.com/watch?v=ZQKMZIP3Fzg</p>
+<p>The goal when using a GPU is to run as many workloads as possible, in parallel, on the available cores, by taking advantage of this hierarchical organization of compute/memory resources.</p>
+<p>A piece of code running on a core of the GPU is called a <strong><em>kernel</em></strong>. It can be written at a high level in CUDA or Triton, for instance, and is then compiled to Parallel Thread Execution (PTX), the low-level assembly used by NVIDIA GPUs.</p>
+<p>To run the kernel you will also need some <strong><em>host code</em></strong>, which is executed on the CPU/host and takes care of preparing data allocations and loading data and code:</p>
+<p>Host code for a CUDA kernel for adding two vectors, adapted from https://docs.nvidia.com/cuda/cuda-c-programming-guide/ and https://blog.codingconfessions.com/p/gpu-computing</p>
+<p>Device code containing the definition of the vector addition kernel, adapted from https://docs.nvidia.com/cuda/cuda-c-programming-guide/ and https://blog.codingconfessions.com/p/gpu-computing</p>
+<p>Kernels are generally scheduled as follows:</p>
+<ul>
+<li>Threads are grouped in <em>warps</em>, each containing 32 threads. All the threads in a warp are synchronized to execute instructions simultaneously but on different parts of the data.</li>
+<li>Warps are grouped in larger <em>blocks</em> of more flexible size (for example, there may be 512 or 1,024 threads in a block), with each block assigned to a single SM. An SM may run several blocks in parallel. However, depending on the resources available, not all of the blocks may get assigned for execution immediately; some may be waitlisted until more resources become available.</li>
+</ul>
+<p>The main thing to retain here is that there are various sizing and allocation constraints (size of the various memories, number of concurrent blocks and threads in the warps) which need to be taken into account to use the GPU architecture in the most efficient way.</p>
+<p>Most of the time, you don’t need to go down to this level of precision and you can reuse the kernels and code prepared by other members of the community - but we'll give you a few tips on getting started with kernels anyway!</p>
+<h3 id="improving-performance-with-kernels">Improving performance with kernels<a class="headerlink" href="#improving-performance-with-kernels" title="Permanent link">&para;</a></h3>
+<p>If you’re looking to add a new operation that lacks an optimized kernel or to speed up an existing PyTorch function, writing kernels from scratch might seem like the most direct route. However, creating high-performance CUDA kernels from scratch requires extensive experience, and there's a steep learning curve. Generally, a better way to get started is to leverage <code>torch.compile</code>, which dynamically optimizes PyTorch code by capturing your operations and generating lower-level, high-performance kernels in Triton.</p>
+<p>Let’s suppose you want to write a kernel for the Exponential Linear Unit (ELU) activation function:</p>
+<div class="arithmatex">\[\text{ELU}(x) = \begin{cases}
+            e^x - 1 &amp; \text{if } x &lt; 0 \\
+            x &amp; \text{if } x \geq 0
+            \end{cases}\]</div>
+<p>You can start by writing a simple PyTorch implementation, and then just add the <code>@torch.compile</code> decorator on top:</p>
+<p>As you can see in the following graph, there's a remarkable performance difference between the compiled and non-compiled versions, especially given that we only added a decorator (<span class="arithmatex">\(N\)</span>here is the number of columns):$$</p>
+<p><img alt="image.png" src="../assets/images/torch-compile-triton.png" /></p>
+<p>However, if this performance increase is insufficient, you can consider implementing Triton kernels. As a starting point, you can take a look at the Triton kernel generated by <code>@torch.compile</code>. To do so, you simply need to set the environment variable <code>TORCH_LOGS</code> to <code>"output_code"</code>:</p>
+<p>Once you run the Python script with the <code>@torch.compile</code> decorator, it will generate and output the corresponding Triton kernel, which in this case is:</p>
+<p>To enhance readability, we can modify the variable names, add comments, and make slight adjustments (or ask an LLM to do it for us), as demonstrated below:</p>
+<p>Here, <code>tl.program_id(0)</code> provides a unique block ID, which we use to determine which section of data that block will process. Using this block ID, <code>block_start</code> calculates the starting index for each block’s section, while <code>block_indices</code> specifies the range of indices within that section. A <code>valid_mask</code> ensures that only indices within <code>num_elements</code> are processed, safely loading the data with <code>tl.load</code>. The ELU function is then applied, modifying values based on whether they're negative, and results are written back to memory with <code>tl.store</code>.</p>
+<p>When we benchmark the generated kernel using <code>triton.testing.Benchmark</code>, we have the following performance:</p>
+<p><img alt="image.png" src="../assets/images/torch-compile-triton-kernel.png" /></p>
+<p>This standalone kernel even demonstrates superior performance with smaller sizes compared to <code>@torch.compile</code>, but this is likely just an artifact of the compilation time of <code>torch.compile</code>. In any case, instead of starting from scratch, remember that you can start from such generated kernels and focus your attention on optimizing their performance, saving you a lot of time.</p>
+<p>Even in Triton, sometimes we cannot fully achieve the peak performance of the device due to the language's limitations in handling low-level details like shared memory and scheduling within streaming multiprocessors. Triton's capabilities are restricted to blocks and scheduling of blocks across SMs. To gain even deeper control, you will need to implement kernels directly in CUDA, where you will have access to all the underlying low-level details.</p>
+<p>With CUDA, various techniques can be employed to improve the efficiency of kernels. We will cover just a few here: optimizing memory access patterns to reduce latency, using shared memory to store frequently accessed data, and managing thread workloads to minimize idle time.</p>
+<p>Before we dive deeper into CUDA examples, let's summarize the tools we've seen that let us write kernel code to execute instructions on the GPU:</p>
+<ol>
+<li>PyTorch: easy but slow</li>
+<li><code>@torch.compile</code>: easy, fast, but not flexible</li>
+<li>Triton: harder, faster, but more flexible</li>
+<li>CUDA: hardest, fastest, and most flexible (if you get it right)</li>
+</ol>
+<p>We'll start by looking at one of the most frequent uses of CUDA: optimizing memory access. The global memory in GPUs (the largest memory area, as you saw earlier) has a long latency and low bandwidth in comparison to the cache, creating a major bottleneck for many applications. Efficiently accessing data from global memory can greatly improve performance.</p>
+<h4 id="memory-coalescing">Memory coalescing<a class="headerlink" href="#memory-coalescing" title="Permanent link">&para;</a></h4>
+<p>To effectively utilize the bandwidth of global memory, it is essential to understand its architecture. In CUDA devices, global memory is implemented using DRAM.</p>
+<p><strong><em>Memory coalescing</em></strong> takes advantage of how DRAM delivers data in bursts whenever a memory address is accessed. Each time a DRAM location is accessed, a sequence of consecutive locations (including the requested one) is read in parallel by multiple sensors in the DRAM chip. Once read, this data can then be quickly transferred to the processor as a burst. In CUDA, coalescing uses this burst behavior to maximize memory access efficiency by ensuring that threads in a warp — a set of 32 threads that execute the same instruction in lockstep — access consecutive memory locations. For instance, if thread 0 accesses location <span class="arithmatex">\(M\)</span>, thread 1 accesses <span class="arithmatex">\(M + 1\)</span>, thread 2 accesses <span class="arithmatex">\(M + 2\)</span>, and so forth, the GPU hardware coalesces or combines these requests into one large, efficient access request for the DRAM burst, rather than handling each access individually.</p>
+<p>Let’s take the example of matrix multiplication. A simple, straightforward implementation would have each thread compute a single element of the output matrix, like this:</p>
+<p>Here’s an excellent visualization of the kernel from Simon Boehm’s fantastic <a href="https://siboehm.com/articles/22/CUDA-MMM">blog post</a>:</p>
+<p><img alt="image.png" src="../assets/images/memorycoalescing.png" /></p>
+<p>However, when profiling this kernel with a tool like <code>ncu</code>, we can see issues, including low memory throughput and uncoalesced memory accesses:</p>
+<p><img alt="image.png" src="../assets/images/memorycoalescing2.png" /></p>
+<p><img alt="image.png" src="../assets/images/memorycoalescing3.png" /></p>
+<p>The reason for this is that in this kernel, two threads in the same block with thread IDs <code>(0, 0)</code> and <code>(1, 0)</code> (which will end up in the same warp) will both load from the same column of matrix <strong>B</strong> but different rows of matrix <strong>A</strong>. Since matrix elements are stored in row-major order (meaning row elements are in consecutive memory addresses, as shown in the figure below), thread <code>(0, 0)</code> will load <span class="arithmatex">\(A_{0,0}\)</span> and thread <code>(1, 0)</code> will load <span class="arithmatex">\(A_{1,0}\)</span> in the first iteration, <span class="arithmatex">\(i = 0\)</span>. These elements are not stored close to each other in memory, and this misalignment will be present at each iteration, thereby preventing memory accesses from being coalesced.</p>
+<p><img alt="image.png" src="../assets/images/memorycoalescing4.png" /></p>
+<p>To improve the performance of our kernel, we can change the way coordinates <code>x</code> and <code>y</code> are calculated to the following:</p>
+<p>Instead of using a 2D block, we switch to a 1D block and redefine how we determine the values of <code>x</code> and <code>y</code>. In this new method, threads within the same warp (which have close <code>threadIdx.x</code> values) will share the same <code>x</code> value but have different <code>y</code> values. This means that they will load the same row of matrix <strong>A</strong> but different columns of matrix <strong>B</strong>. As a result, memory accesses can be coalesced for a row-major matrix.</p>
+<p>When we profile our new kernel, we notice that the warning about uncoalesced memory accesses has disappeared, and <strong>the GPU's memory throughput has increased by approximately a factor of 10</strong>.</p>
+<p><img alt="image.png" src="../assets/images/memorycoalescing5.png" /></p>
+<p>We also notice that <strong>the execution time of the kernel has decreased by 10x</strong>. Amazing!</p>
+<p>Now let's cover another technique you will often see mentioned in the literature: <strong><em>tiling</em></strong>.</p>
+<h4 id="tiling">Tiling<a class="headerlink" href="#tiling" title="Permanent link">&para;</a></h4>
+<p>Tiling is a technique that leverages shared memory to optimize memory access patterns. As we mentioned earlier, the shared memory on a GPU is a small, fast memory area accessible by all threads within a block. It allows data to be reused by multiple threads, reducing the need to repeatedly load data from the slower global memory.</p>
+<p>In matrix multiplication, for example, each thread in a block may need elements from two matrices, say <strong>A</strong> and <strong>B</strong>. If each thread independently loads the row and column it needs from global memory, we'll end up with many redundant loads, as multiple threads in a block will access overlapping data. Instead, we can use tiling to load a block (or "tile") of <strong>A</strong> and <strong>B</strong> into shared memory just once, allowing all threads in that block to reuse the same shared data.</p>
+<p>In the tiling approach, each iteration involves all threads within a block cooperatively loading two tiles — one from matrix <strong>A</strong> and another from matrix <strong>B</strong> — into shared memory. Specifically, the threads load a tile of matrix <strong>A</strong> (of size <code>BLOCK_SIZE_M</code> by <code>BLOCK_SIZE_K</code>) and a tile of matrix <strong>B</strong> (of size <code>BLOCK_SIZE_K</code> by <code>BLOCK_SIZE_N</code>). Once the tiles are in shared memory, the threads perform matrix multiplication on these tiles, enabling efficient computation since all the necessary data is quickly accessible. The results of the tile multiplication are stored in an accumulation matrix that holds intermediate results. After each iteration, the results from the current tile multiplication are added to this accumulation matrix, continuing until all tiles from both matrices have been processed.</p>
+<p><img alt="image.png" src="../assets/images/tiling.png" /></p>
+<p>From <a href="https://cnugteren.github.io/tutorial/pages/page4.html">https://cnugteren.github.io/tutorial/pages/page4.html</a></p>
+<p>Let's take a look at the important parts you need to understand from the implementation:</p>
+<p>Each thread begins by loading one element from both matrix <strong>A</strong> and matrix <strong>B</strong> into shared memory. In this scenario, achieving coalesced memory access is straightforward: by assigning <code>threadIdx.x</code> as the <em>local column index</em> (<code>localCol</code>), we ensure that threads within the same warp will access adjacent elements of both matrices. After each thread in the block completes loading its elements into shared memory (ensured by calling <code>__syncthreads()</code>), they proceed to compute the dot product of the two tiles. Once the threads have iterated through all the tiles — horizontally for <strong>A</strong> and vertically for <strong>B</strong> - the resulting sum is stored in the corresponding location of matrix <strong>C</strong>.</p>
+<p>When benchmarking this kernel using <code>ncu</code>, we noticed that the memory throughput increased to 410 Gb/s and the kernel execution time decreased by ~43%, achieving a ~6.6 TFLOPS performance.</p>
+<h4 id="thread-coarsening">Thread coarsening<a class="headerlink" href="#thread-coarsening" title="Permanent link">&para;</a></h4>
+<p>The tiling technique has significantly improved the performance of our kernel. However, when analyzing the warp states, which quantify how many cycles were spent in each state, we observe the following:</p>
+<p><img alt="image.png" src="../assets/images/threadcoarsening.png" /></p>
+<p>The meaning of these cryptic state names can be found in <a href="https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-reference">NVIDIA's Kernel Profiling Guide</a>, in the "Warp Stall Reasons" section. There, we see that <code>smsp__pcsamp_warps_issue_stalled_mio_throttle</code> indicates "Warp was stalled waiting for the MIO (memory input/output) instruction queue to be not full. This stall reason is high in cases of extreme utilization of the MIO pipelines, which include special math instructions, dynamic branches, as well as shared memory instructions. When caused by shared memory accesses, trying to use fewer but wider loads can reduce pipeline pressure."</p>
+<p>So it seems warps are stalling waiting for shared memory accesses to return! To solve this issue we can apply a technique called <strong><em>thread coarsening</em></strong>, which involves merging several threads into a single coarsened thread. This will significantly reduce shared memory accesses, as each coarsened thread can handle multiple output elements.</p>
+<p>Next, let's briefly go through a last important consideration when writing or improving custom kernels: <strong><em>minimizing control divergence</em></strong>.</p>
+<h4 id="minimizing-control-divergence">Minimizing control divergence<a class="headerlink" href="#minimizing-control-divergence" title="Permanent link">&para;</a></h4>
+<p>A streaming multiprocessor is built to execute all threads in a warp using the <em>Single Instruction, Multiple Data (SIMD)</em> model. This means that at any given moment, one instruction is fetched and executed simultaneously for all threads within the warp. When a warp is executed, the threads within it operate on different segments of the data but follow the same instruction (hence the name Single Instruction, Multiple Data). The primary advantage of SIMD is its efficiency: the control hardware responsible for instruction fetching and dispatching is shared among multiple execution units. This design minimizes the hardware overhead associated with control functions, allowing a greater portion of the hardware to focus on improving arithmetic throughput.</p>
+<p><em>Control divergence</em> occurs when threads within the same warp take different execution paths. For instance, if a conditional statement (like an <code>if</code> statement) leads to some threads executing one block of code while others execute a different block, the warp must serialize these executions, resulting in idle threads waiting for others to complete.  To minimize control divergence, we need to design kernels to ensure that threads within the same warp follow the same execution path. This can be achieved by restructuring code to reduce branching, using data structures that ensure all threads follow similar execution paths, or employing techniques such as predication.</p>
+<p>We have covered some of the main considerations when writing custom kernels and improving the performance and memory footprint of GPU operations. But there’s one more important concept to consider before we move to a real example: <strong><em>fusing kernels</em></strong>.</p>
+<h3 id="fused-kernels">Fused kernels<a class="headerlink" href="#fused-kernels" title="Permanent link">&para;</a></h3>
+<p>In several places now, we’ve mentioned how GPU and CPU operation can be asynchronous. In particular, the host code on the CPU can schedule workloads on the GPU in a non-blocking way.</p>
+<p>This can be useful for overlapping communication and computation – as we've seen many times in our journey – but it can also be extended to the more general idea of trying to avoid, at all cost, going back and forth between host and GPU kernel commands.</p>
+<p>This idea is beautifully illustrated by <a href="https://upload.wikimedia.org/wikipedia/commons/b/b2/Hausziege_04.jpg">Horace He</a> in <a href="https://horace.io/brrr_intro.html">these diagrams:</a></p>
+<p><img alt="image.png" src="../assets/images/fused_kernels1.png" /></p>
+<p>A sequence of kernels requiring back and forth between global memory and compute units</p>
+<p><img alt="image.png" src="../assets/images/fused_kernels2.png" /></p>
+<p>Instead of sending our triangle back to global memory just to read it back again, we do all of our operations in one go.</p>
+<p>How can we avoid the back and forth shown on the left? Well, the best way is to make our GPU as autonomous as possible. This is achieved by packing as many successive compute operations as possible together in a single kernel for the GPU to run, called a “fused kernel,” as shown on the right.</p>
+<p>Fused kernels are especially efficient and simple to write for successions of point-like operations that are performed independently of each other on each input token. In this case, there is no point in sending the computed values back to global memory before moving them to SM memory and spinning up a new kernel. It's much more efficient to keep all the values locally until all the computations have been performed.</p>
+<p>In a Transformer model, this "fusing" approach can be applied every time we have a succession of point-wise operations, such as in the computations involved in the LayerNorm layers.</p>
+<p>We now have all the understanding necessary to marvel at a true masterpiece of kernel engineering: <strong><em>FlashAttention</em></strong>.</p>
+<h3 id="flashattention">FlashAttention<a class="headerlink" href="#flashattention" title="Permanent link">&para;</a></h3>
+<p>FlashAttention was introduced by <a href="https://tridao.me">Tri Dao</a> and proposed to optimize attention computations by writing custom CUDA kernels to make them much faster <em>and</em> more memory efficient. The idea behind FlashAttention is to make efficient use of the various memories of the GPU to avoid relying too much on the slowest one: the global memory.</p>
+<p>The global memory in modern GPUs often uses a technology called <a href="https://semianalysis.com/2024/09/03/the-memory-wall/#hbm-roadmap"></a>High Bandwidth Memory (HBM), which despite its name, is slower than SRAM in the GPU memory hierarchy. This HBM terminology will be important when we discuss the details of FlashAttention's implementation.</p>
+<p>A basic implementation of the attention mechanism involves a lot of transfer between memory and workers. It requires materializing the <strong>S</strong> matrix (where S = QK^T, the attention scores) and the <strong>P</strong> matrix (where P = softmax(S), the normalized attention weights) in HBM, which means that the results need to be sent to HBM and then back to SRAM for the next computations:</p>
+<p><img alt="image.png" src="../assets/images/flashattn.png" /></p>
+<p>Since bandwidth is much lower in HBM, this introduces a severe bottleneck in the attention computation. Can we do better? <a href="https://upload.wikimedia.org/wikipedia/commons/b/b2/Hausziege_04.jpg">Tri Dao</a> says yes!</p>
+<p>The key element is to compute the <strong>S</strong> matrix in small pieces that can fit in the smaller shared memory of the SM. But we can do even better and avoid materializing the very large <strong>S</strong> matrix altogether, in favor of keeping only the necessary statistics for computing the normalization factor of the softmax. So, we can compute part of <span class="arithmatex">\(O\)</span> directly in one computation in SRAM rather than moving intermediate results back and forth. In this case, not only do we make use of the shared memory, but we also release the memory bottleneck resulting from materializing one of the largest activation matrices in the model (at long context length): the attention matrix.</p>
+<p><img alt="image.png" src="../assets/images/flashattn2.png" /></p>
+<p>Source: FlashAttention paper[]</p>
+<p>The idea of FlashAttention resolves so many bottlenecks in model training that it has quickly become the default way to perform attention in all transformers. Notably:</p>
+<ul>
+<li>By avoiding materializing the <strong>S</strong> matrix, we <strong>reduce the memory burden of attention</strong>.</li>
+<li>We also <strong>remove a large part of the naive impact of the <span class="arithmatex">\(O(S^2)\)</span> cost of attention</strong>.</li>
+</ul>
+<p>All variants of linear attention and subquadratic approaches to approximate attention (developed shortly after the invention of the Transformer architecture) have mostly been put aside in favor of this exact and fast FlashAttention implementation and mechanism.</p>
+<p>Following FlashAttention-1, two successive improved versions were released by the same lab: FlashAttention-2 and -3. In comparison to FlashAttention-1, the improvements in FlashAttention-2 and -3 are less about the general attention mechanism and more about tailoring its low-level implementation more specifically to the GPU by (1) reducing the number of non-matmul operations as much as possible, (2) carefully partitioning the workload among wraps and thread blocks (for FlashAttention-2), and (3) carefully optimizing for FP8 and Tensor Core support on the latest Hopper (H100) architecture for FlashAttention-3.</p>
+<p>FlashAttention is a master demonstration of the breakthrough improvements that can come when you take into account the internal memory/compute design of current GPU accelerators.</p>
+<p>The techniques described so far in this section have required us to implement modeling code changes and write custom kernels for certain operations in order to speed up training.</p>
+<p>In the final section of our low-level dive into the compute operations themselves, we will take a look at a range of methods that are agnostic to the modeling code. They can be used for any model, and are so widely used that they have become standard in the industry: up next, <strong><em>mixed precision training</em></strong>!</p>
+<h3 id="mixed-precision-training">Mixed precision training<a class="headerlink" href="#mixed-precision-training" title="Permanent link">&para;</a></h3>
+<p>In various sections of this book, we've talked about lower-precision formats and their impact on the memory requirements for storing activations, parameters, and optimizer states. It's now time to dive deeper into the details of these formats and get a better understanding of their trade-offs, advantages, and limitations.</p>
+<p>Mixed precision training, as the name suggests, involves mixing different precisions when training. The default numerical precision of PyTorch tensors is <em>single-precision floating-point format</em>, also called <em>FP32</em> or <em>float32</em>, which means that every number stored takes up 32 bits, or 4 bytes. The available bits to represent a number are divided into three parts:</p>
+<ul>
+<li>Sign: the first bit determines if the number is positive or negative</li>
+<li>Exponent: controls the magnitude of the number</li>
+<li>Mantissa: determines the significant figures of the number</li>
+</ul>
+<p><img alt="sign-mantissa-exponent.svg" src="../assets/images/sign-mantissa-exponent.svg" /></p>
+<p>The principle of floating-point numbers can be easily illustrated by recalling the scientific notation of numbers, e.g. <span class="arithmatex">\(- 5.734 \times 10^{7}\)</span>, where we first have the sign, followed by the mantissa and the exponent. As such, we can represent numbers across a wide range of magnitudes with an adaptive precision. Although float32 is the default, there are a range of floating-point formats available in PyTorch:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Format</strong></th>
+<th><strong>Total bits</strong></th>
+<th><strong>Sign</strong></th>
+<th><strong>Exponent</strong></th>
+<th><strong>Mantissa</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>float32</td>
+<td>32</td>
+<td>1</td>
+<td>8</td>
+<td>23</td>
+</tr>
+<tr>
+<td>float16</td>
+<td>16</td>
+<td>1</td>
+<td>5</td>
+<td>10</td>
+</tr>
+<tr>
+<td>bfloat16</td>
+<td>16</td>
+<td>1</td>
+<td>8</td>
+<td>7</td>
+</tr>
+<tr>
+<td>float8 (e4m3)</td>
+<td>8</td>
+<td>1</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr>
+<td>float8 (e5m2)</td>
+<td>8</td>
+<td>1</td>
+<td>5</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p>Reducing the total number of bits comes at a price (no free lunch here either), but we have some control over how to pay: we can sacrifice bits in either the mantissa or the exponent. For this reason, there also exist two float8 (FP8) formats, named according to the exponent and mantissa, so we can flexibly choose the most appropriate format. Let's take a look at the possible range of numbers for each format:</p>
+<p><img alt="image.png" src="../assets/images/mixedprecision.png" /></p>
+<p>We can see that float32 spans 80 orders of magnitude, and float16 sacrifices a lot of range while bfloat16 maintains the full range. The two float8 formats reduce the range even further: e5m2 can maintain the float16 range, but e4m3 has an even smaller range.</p>
+<p>How come some formats are able to maintain the full range while others aren't? Let's investigate their resolutions by plotting 10,000 points between 1 and 2. Each point will be rounded to the nearest representable number in each format:</p>
+<p><img alt="image.png" src="../assets/images/mixedprecision_2.png" /></p>
+<p>We can see here that although bfloat16 maintains the range of float32 (unlike float16), it does this at the cost of sacrificing more precision. In the case of float8 the situation is even more dire: e4m3 can represent only 7 and e5m2 only 3 numbers in the interval [1,2].</p>
+<p>A common metric to measure a format's resolution is <em>epsilon</em>: the first representable number after <span class="arithmatex">\(1.00\)</span>. We can see that for the float32 format, <span class="arithmatex">\(10^{-4}\)</span> is an upper bound (it’s actually <span class="arithmatex">\(1.19^{-7}\)</span>). For float16 it's ~<span class="arithmatex">\(10^{-3}\)</span>, and for bfloat it's 10x higher still.</p>
+<p>The idea of mixed precision training is to use some of these lower-precision formats for certain computations while maintaining the performance of full precision training. As it turns out, we <strong>can’t</strong> totally abandon float32 and usually will need to do some of the computations in full precision.</p>
+<p>Let’s now take a look at training models with 16 bits and then see if we can take it a step further, all the way down to 8 bits.</p>
+<h4 id="fp16-and-bf16-training">FP16 and BF16 training<a class="headerlink" href="#fp16-and-bf16-training" title="Permanent link">&para;</a></h4>
+<p>Naively switching all the tensors and operations to float16 unfortunately doesn’t work, and the result is usually diverging losses. However, the original mixed precision training paper[] came up with three tricks to match float32 training:</p>
+<ol>
+<li><strong>FP32 copy of weights:</strong> There are two possible issues with FP16 weights. During training, some of the weights can become very small and will be rounded to 0. However, even if the weights themselves are not close to 0, if the updates are very small the difference in magnitude can cause them to underflow during the addition. Once the weights are 0, they will remain at 0 for the rest of training as there is no gradient signal coming through anymore.</li>
+<li><strong>Loss scaling:</strong> We have a similar issue with the gradients as well, as gradients tend to be much smaller than 1 and are thus at risk of underflow. A simple yet effective strategy is to scale the loss before the backward pass and unscale the gradients after the backward pass. This ensures that there is no underflow during the backward pass, and the scaling does not affect training because we unscale before processing the gradients further (e.g., clipping) and the optimization step.</li>
+<li><strong>Accumulation:</strong> Finally, when performing certain arithmetic operations in 16-bit precision (such as averages or summations), we can also face under- or overflows. A solution then is to accumulate intermediate results in FP32 during the operation and only cast the final result back to 16-bit precision.</li>
+</ol>
+<p>With these techniques, we can get stable training while benefitting from higher throughput due to the faster, lower-precision arithmetic operations.</p>
+<p>Naturally, as a curious reader – and by now slightly addicted to maximizing the throughput – you may ask the question: Can we go further and faster than 16-bit precision?</p>
+<p>Maybe!</p>
+<h4 id="fp8-pretraining">FP8 pretraining<a class="headerlink" href="#fp8-pretraining" title="Permanent link">&para;</a></h4>
+<p>Even if we perfectly overlap communication with computation, we always eventually run into the low-level theoretical FLOPS limit of the hardware itself - i.e., the efficiency of each individual operation on our hardware. This is where numerical precision becomes crucial. For instance, on NVIDIA's H100 GPU, FP8 matrix multiplications (GEMM operations) achieve twice the theoretical FLOPS of BF16, making lower-precision training an attractive path for further optimization.</p>
+<p>Recent research - including FP8-LM[], torchao[], and DeepSeek-V3[] - has demonstrated the potential of FP8 training for large-scale models. Still, FP8 pretraining introduces a significant challenge: <strong>stability</strong>. At lower precision, numerical instability often leads to loss divergence, making it difficult to match the accuracy of higher-precision training.</p>
+<p>We know that instability increases as learning rates rise for a fixed model size[], making FP8 pretraining particularly tricky.</p>
+<p>Here is an example of a typically divergent loss curve for FP8 training:</p>
+<iframe src="/ultra-scale-book/fragments/fp8_training_loss_curves.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/fp8_training_loss_curves.html">Open full interactive visualization: Fp8 Training Loss Curves</a></em></p>
+<p>The first successful very large scale training with FP8 mixed precision was publicly reported in the DeepSeek-V3 technical report[]. The authors carefully analyzed each operation of the forward pass (<em>Fprop</em>) as well as the activation (<em>Dgrad</em>) and weight (<em>Wgrad</em>) backward passes. Similar to BF16 mixed precision training, some aggregations and master weights are kept in higher precision while the operations themselves are performed in FP8.</p>
+<p><img alt="image.png" src="../assets/images/fp8_diagram.png" /></p>
+<p>In order to switch from high precision (e.g., FP32 or BF16) to lower precision (e.g., FP16 or FP8) with a smaller range, we need to normalize the range of activation values, for instance by computing their absolute maximum. DeepSeek-V3 further introduced a specific quantization scheme where the ranges are normalized per tile: 1x128 for inputs/activations and 128x128 for weights and scale elements. This makes the normalization less strongly impacted by outlier values in the activations. The authors also proposed a number of additional tricks to further reduce the memory and communication footprint, which you can read about in section 3.3 of the technical report[].</p>
+<p>Here’s a summary of a few known approaches to FP8 training:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>GEMM's precision</th>
+<th>Master model weights</th>
+<th>Accumulated gradients</th>
+<th>Model weights</th>
+<th>Gradients</th>
+<th>Optimizer states</th>
+<th>Total memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BF16 with FP32 mixed precision baseline</td>
+<td>BF16</td>
+<td>FP32</td>
+<td>FP32</td>
+<td>BF16</td>
+<td>BF16</td>
+<td>FP32 + FP32</td>
+<td>4 + 4 + 2 + 2 + 4 + 4 = 20 bytes</td>
+</tr>
+<tr>
+<td>The above without FP32 grad accumulation</td>
+<td>BF16</td>
+<td>FP32</td>
+<td>n/a</td>
+<td>BF16</td>
+<td>BF16</td>
+<td>FP32 + FP32</td>
+<td>4 + 2 + 2 + 4 + 4 = 16 bytes (20% reduction)</td>
+</tr>
+<tr>
+<td>Transformer engine</td>
+<td>FP8</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>FP32</td>
+<td>FP32</td>
+<td>FP32 + FP32</td>
+<td>4 + 4 + 4 + 4 = 16 bytes (20% reduction)</td>
+</tr>
+<tr>
+<td>FP8-LM's O3 level</td>
+<td>FP8</td>
+<td>FP16</td>
+<td>FP16</td>
+<td>FP8</td>
+<td>FP8</td>
+<td>FP8 + FP16</td>
+<td>2 + 2 + 1 + 1 + 1 + 2 = 9 bytes (55% reduction)</td>
+</tr>
+<tr>
+<td>DeepSeek-V3</td>
+<td>FP8</td>
+<td>FP32</td>
+<td>FP32</td>
+<td>FP8</td>
+<td>BF16</td>
+<td>BF16 + BF16</td>
+<td>4 + 4 + 1 + 2 + 2 + 2 = 15 (25% reduction)</td>
+</tr>
+<tr>
+<td>Nanotron's FP8</td>
+<td>FP8</td>
+<td>BF16</td>
+<td>FP32</td>
+<td>FP8</td>
+<td>FP8</td>
+<td>FP8 + FP8</td>
+<td>2 + 4 + 1 + 1 + 1 + 1 = 10 bytes (50% reduction)</td>
+</tr>
+</tbody>
+</table>
+<p>Overall, FP8 remains (in early 2025) an experimental technique, and methods are still evolving. Given its obvious benefits, it will likely become the standard and soon replace BF16 mixed precision. To see an open source implementation of FP8 training techniques, check out <a href="https://github.com/huggingface/nanotron/pull/70">this Nanotron PR</a>.</p>
+<p>Projecting further into the future, Blackwell, the next generation of NVIDIA chips, <a href="https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/">have been announced</a> to support FP4 training, further speeding up training but without a doubt also introducing a new training stability challenge.</p>
+<p>This last section concluded our long journey into the land of fast and large model training on tens to thousands of GPUs. Time to slowly bring our GPU cluster to rest and take a step back to reflect on all we've learned along the way!</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/lzx1413/ultra-scale-book" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

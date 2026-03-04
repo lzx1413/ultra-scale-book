@@ -191,7 +191,7 @@ We now have all the understanding necessary to marvel at a true masterpiece of k
 
 FlashAttention was introduced by [Tri Dao](https://tridao.me) and proposed to optimize attention computations by writing custom CUDA kernels to make them much faster *and* more memory efficient. The idea behind FlashAttention is to make efficient use of the various memories of the GPU to avoid relying too much on the slowest one: the global memory.
 
-The global memory in modern GPUs often uses a technology called [](https://semianalysis.com/2024/09/03/the-memory-wall/#hbm-roadmap)High Bandwidth Memory (HBM), which despite its name, is slower than SRAM in the GPU memory hierarchy. This HBM terminology will be important when we discuss the details of FlashAttention's implementation.
+The global memory in modern GPUs often uses a technology called [^1](https://semianalysis.com/2024/09/03/the-memory-wall/#hbm-roadmap)High Bandwidth Memory (HBM), which despite its name, is slower than SRAM in the GPU memory hierarchy. This HBM terminology will be important when we discuss the details of FlashAttention's implementation.
 
 A basic implementation of the attention mechanism involves a lot of transfer between memory and workers. It requires materializing the **S** matrix (where S = QK^T, the attention scores) and the **P** matrix (where P = softmax(S), the normalized attention weights) in HBM, which means that the results need to be sent to HBM and then back to SRAM for the next computations:
 
@@ -203,7 +203,7 @@ The key element is to compute the **S** matrix in small pieces that can fit in t
 
 ![image.png](assets/images/flashattn2.png)
 
-Source: FlashAttention paper[]
+Source: FlashAttention paper[^2]
 
 The idea of FlashAttention resolves so many bottlenecks in model training that it has quickly become the default way to perform attention in all transformers. Notably:
 
@@ -262,7 +262,7 @@ Let’s now take a look at training models with 16 bits and then see if we can t
 
 #### FP16 and BF16 training
 
-Naively switching all the tensors and operations to float16 unfortunately doesn’t work, and the result is usually diverging losses. However, the original mixed precision training paper[] came up with three tricks to match float32 training:
+Naively switching all the tensors and operations to float16 unfortunately doesn’t work, and the result is usually diverging losses. However, the original mixed precision training paper[^3] came up with three tricks to match float32 training:
 
 1. **FP32 copy of weights:** There are two possible issues with FP16 weights. During training, some of the weights can become very small and will be rounded to 0. However, even if the weights themselves are not close to 0, if the updates are very small the difference in magnitude can cause them to underflow during the addition. Once the weights are 0, they will remain at 0 for the rest of training as there is no gradient signal coming through anymore.
 2. **Loss scaling:** We have a similar issue with the gradients as well, as gradients tend to be much smaller than 1 and are thus at risk of underflow. A simple yet effective strategy is to scale the loss before the backward pass and unscale the gradients after the backward pass. This ensures that there is no underflow during the backward pass, and the scaling does not affect training because we unscale before processing the gradients further (e.g., clipping) and the optimization step.
@@ -278,9 +278,9 @@ Maybe!
 
 Even if we perfectly overlap communication with computation, we always eventually run into the low-level theoretical FLOPS limit of the hardware itself - i.e., the efficiency of each individual operation on our hardware. This is where numerical precision becomes crucial. For instance, on NVIDIA's H100 GPU, FP8 matrix multiplications (GEMM operations) achieve twice the theoretical FLOPS of BF16, making lower-precision training an attractive path for further optimization.
 
-Recent research - including FP8-LM[], torchao[], and DeepSeek-V3[] - has demonstrated the potential of FP8 training for large-scale models. Still, FP8 pretraining introduces a significant challenge: **stability**. At lower precision, numerical instability often leads to loss divergence, making it difficult to match the accuracy of higher-precision training.
+Recent research - including FP8-LM[^4], torchao[^5], and DeepSeek-V3[^6] - has demonstrated the potential of FP8 training for large-scale models. Still, FP8 pretraining introduces a significant challenge: **stability**. At lower precision, numerical instability often leads to loss divergence, making it difficult to match the accuracy of higher-precision training.
 
-We know that instability increases as learning rates rise for a fixed model size[], making FP8 pretraining particularly tricky.
+We know that instability increases as learning rates rise for a fixed model size[^7], making FP8 pretraining particularly tricky.
 
 Here is an example of a typically divergent loss curve for FP8 training:
 
@@ -288,11 +288,11 @@ Here is an example of a typically divergent loss curve for FP8 training:
 
 *[Open full interactive visualization: Fp8 Training Loss Curves](/ultra-scale-book/fragments/fp8_training_loss_curves.html)*
 
-The first successful very large scale training with FP8 mixed precision was publicly reported in the DeepSeek-V3 technical report[]. The authors carefully analyzed each operation of the forward pass (*Fprop*) as well as the activation (*Dgrad*) and weight (*Wgrad*) backward passes. Similar to BF16 mixed precision training, some aggregations and master weights are kept in higher precision while the operations themselves are performed in FP8.
+The first successful very large scale training with FP8 mixed precision was publicly reported in the DeepSeek-V3 technical report[^8]. The authors carefully analyzed each operation of the forward pass (*Fprop*) as well as the activation (*Dgrad*) and weight (*Wgrad*) backward passes. Similar to BF16 mixed precision training, some aggregations and master weights are kept in higher precision while the operations themselves are performed in FP8.
 
 ![image.png](assets/images/fp8_diagram.png)
 
-In order to switch from high precision (e.g., FP32 or BF16) to lower precision (e.g., FP16 or FP8) with a smaller range, we need to normalize the range of activation values, for instance by computing their absolute maximum. DeepSeek-V3 further introduced a specific quantization scheme where the ranges are normalized per tile: 1x128 for inputs/activations and 128x128 for weights and scale elements. This makes the normalization less strongly impacted by outlier values in the activations. The authors also proposed a number of additional tricks to further reduce the memory and communication footprint, which you can read about in section 3.3 of the technical report[].
+In order to switch from high precision (e.g., FP32 or BF16) to lower precision (e.g., FP16 or FP8) with a smaller range, we need to normalize the range of activation values, for instance by computing their absolute maximum. DeepSeek-V3 further introduced a specific quantization scheme where the ranges are normalized per tile: 1x128 for inputs/activations and 128x128 for weights and scale elements. This makes the normalization less strongly impacted by outlier values in the activations. The authors also proposed a number of additional tricks to further reduce the memory and communication footprint, which you can read about in section 3.3 of the technical report[^9].
 
 Here’s a summary of a few known approaches to FP8 training:
 
@@ -310,3 +310,29 @@ Overall, FP8 remains (in early 2025) an experimental technique, and methods are 
 Projecting further into the future, Blackwell, the next generation of NVIDIA chips, [have been announced](https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/) to support FP4 training, further speeding up training but without a doubt also introducing a new training stability challenge.
 
 This last section concluded our long journey into the land of fast and large model training on tens to thousands of GPUs. Time to slowly bring our GPU cluster to rest and take a step back to reflect on all we've learned along the way!
+
+
+---
+
+## References
+
+[^1]: Sam McCandlish and Jared Kaplan and Dario Amodei and OpenAI Dota Team. **An Empirical Model of Large-Batch Training**. 2018. [Link](https://arxiv.org/abs/1812.06162). [arXiv:1812.06162](https://arxiv.org/abs/1812.06162). 
+
+[^2]: DeepSeek-AI and others. **DeepSeek-V3 Technical Report**. 2024. [Link](https://arxiv.org/abs/2412.19437). [arXiv:2412.19437](https://arxiv.org/abs/2412.19437).
+
+[^3]: Paulius Micikevicius and Sharan Narang and Jonah Alben and Gregory Diamos and Erich Elsen and David Garcia and Boris Ginsburg and Michael Houston and Oleksii Kuchaiev and Ganesh Venkatesh and Hao Wu. **Mixed Precision Training**. 2018. [Link](https://arxiv.org/abs/1710.03740). [arXiv:1710.03740](https://arxiv.org/abs/1710.03740). 
+
+[^4]: Vijay Korthikanti and Jared Casper and Sangkug Lym and Lawrence McAfee and Michael Andersch and Mohammad Shoeybi and Bryan Catanzaro. **Reducing Activation Recomputation in Large Transformer Models**. 2022. [Link](https://arxiv.org/abs/2205.05198). [arXiv:2205.05198](https://arxiv.org/abs/2205.05198).
+
+[^5]: Samyam Rajbhandari and Jeff Rasley and Olatunji Ruwase and Yuxiong He. **ZeRO: Memory Optimizations Toward Training Trillion Parameter Models**. 2020. [Link](https://arxiv.org/abs/1910.02054). [arXiv:1910.02054](https://arxiv.org/abs/1910.02054). 
+
+[^6]: Guanhua Wang and Chengming Zhang and Zheyu Shen and Ang Li and Olatunji Ruwase. **Domino: Eliminating Communication in LLM Training via Generic Tensor Slicing and Overlapping**. 2024. [Link](https://arxiv.org/abs/2409.15241). [arXiv:2409.15241](https://arxiv.org/abs/2409.15241).
+
+[^7]: Hao Liu and Matei Zaharia and Pieter Abbeel. **Ring Attention with Blockwise Transformers for Near-Infinite Context**. 2023. [Link](https://arxiv.org/abs/2310.01889). [arXiv:2310.01889](https://arxiv.org/abs/2310.01889). 
+
+[^8]: William Brandon and Aniruddha Nrusimha and Kevin Qian and Zachary Ankner and Tian Jin and Zhiye Song and Jonathan Ragan-Kelley. **Striped Attention: Faster Ring Attention for Causal Transformers**. 2023. [Link](https://arxiv.org/abs/2311.09431). [arXiv:2311.09431](https://arxiv.org/abs/2311.09431).
+
+[^9]: Joel Lamy-Poirier. **Breadth-First Pipeline Parallelism**. 2023. [Link](https://arxiv.org/abs/2211.05953). [arXiv:2211.05953](https://arxiv.org/abs/2211.05953). 
+
+[^10]: Penghui Qi and Xinyi Wan and Guangxing Huang and Min Lin. **Zero Bubble Pipeline Parallelism**. 2023. [Link](https://arxiv.org/abs/2401.10241). [arXiv:2401.10241](https://arxiv.org/abs/2401.10241).
+

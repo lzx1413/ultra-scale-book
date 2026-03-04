@@ -18,7 +18,7 @@ In this figure, the boxes on the top line can be seen as successive layers insid
 
 The ***batch size*** ($bs$) is one of the important hyperparameters for model training; it affects both model convergence and throughput.
 
-A small batch size can be useful early in training to quickly move through the training landscape to reach an optimal learning point. However, further along in the model training, small batch sizes will keep gradients noisy, and the model may not be able to converge to the most optimal final performance. At the other extreme, a large batch size, while giving very accurate gradient estimations, will tend to make less use of each training token, rendering convergence slower and potentially wasting compute resources. You can find a nice early discussion of this topic in OpenAI’s paper on large batch training[], or in section 4.2 of the MiniMax-01 [technical report](https://filecdn.minimax.chat/_Arxiv_MiniMax_01_Report.pdf).
+A small batch size can be useful early in training to quickly move through the training landscape to reach an optimal learning point. However, further along in the model training, small batch sizes will keep gradients noisy, and the model may not be able to converge to the most optimal final performance. At the other extreme, a large batch size, while giving very accurate gradient estimations, will tend to make less use of each training token, rendering convergence slower and potentially wasting compute resources. You can find a nice early discussion of this topic in OpenAI’s paper on large batch training[^13], or in section 4.2 of the MiniMax-01 [technical report](https://filecdn.minimax.chat/_Arxiv_MiniMax_01_Report.pdf).
 
 Batch size also affects the time it takes to train on a given text dataset: a small batch size will require more optimizer steps to train on the same amount of samples. Optimizer steps are costly (in compute time), and the total time to train will thus increase compared to using a larger batch size. That being said, note that the batch size can often be adjusted quite widely around the optimal batch size without major impact on the performance of the model - that is, the sensitivity of final model performance to the exact batch size value is usually rather low around the optimal batch size.
 
@@ -90,7 +90,7 @@ $$\begin{aligned}
             & m_{opt} = (4+4) * N
             \end{aligned}$$
 
-Now, let’s have a look at how things change if we use a lower precision. For stability reasons (see the section on [mixed precision training](#mixed_precision_training) later in the book), we often don't use full low precision training but a mix of higher and lower precision called "mixed precision"[]. The default nowadays for mixed precision training is to generally use BF16 for most of the computations – requiring 2 bytes per parameter and gradient – as well as storing an additional copy of the model weights and gradients in FP32, making 12 bytes per parameter in total. In addition to the parameters and gradients, we need to store the optimizer states; for the Adam optimizer, this requires the momentum and the variance, usually stored in FP32 for numerical stability, each using 4 bytes.
+Now, let’s have a look at how things change if we use a lower precision. For stability reasons (see the section on [mixed precision training](#mixed_precision_training) later in the book), we often don't use full low precision training but a mix of higher and lower precision called "mixed precision"[^14]. The default nowadays for mixed precision training is to generally use BF16 for most of the computations – requiring 2 bytes per parameter and gradient – as well as storing an additional copy of the model weights and gradients in FP32, making 12 bytes per parameter in total. In addition to the parameters and gradients, we need to store the optimizer states; for the Adam optimizer, this requires the momentum and the variance, usually stored in FP32 for numerical stability, each using 4 bytes.
 
 Here’s the summary:
 
@@ -134,7 +134,7 @@ $$m_{act} =  L \cdot seq \cdot bs \cdot h \cdot (34 + \frac{5 \cdot n_{heads} \c
 
 Here, $L$ is the number of layers, $seq$ the sequence length, $bs$ the batch size in samples, $h$ the hidden dimension of the model, and $n_{heads}$ the number of heads.
 
-For the exact derivation of the numbers, you can follow the original NVIDIA paper on recomputation [] - it essentially requires you to do some accounting of all the sizes of intermediate activations between each operation in a transformer layer.
+For the exact derivation of the numbers, you can follow the original NVIDIA paper on recomputation [^15] - it essentially requires you to do some accounting of all the sizes of intermediate activations between each operation in a transformer layer.
 
 An interesting observation here is that memory usage is not static for a given model; rather, it scales linearly with the batch size and quadratically with the sequence length. This means the activation memory is the part that will blow up when we increase our batch size or train with longer sequences. We can use this equation to look at how memory usage changes for various sequence lengths, for example for Llama models (`bs=1`):
 
@@ -157,7 +157,7 @@ The general idea behind activation recomputation – also called *gradient check
 There are a few strategies for selecting key activations to store:
 
 - **Full:** We checkpoint activations at the transition point between each layer of the Transformer model. This is usually called the “full” strategy since it requires a forward pass through each layer, essentially adding a full forward pass during the backward pass. This strategy saves the most memory but is the most expensive one in terms of compute. It typically increases the compute cost and time by up to 30-40%, which is very noticeable.
-- **Selective:** In general, we can do better than full. The authors of the recomputation paper[] did a detailed analysis studying which activations grow the largest and have the cheapest recomputation cost in terms of floating-point operations per second (FLOPS). It turns out that the attention computations fall in that category, and thus we can usually discard them and focus on checkpointing the expensive feedforward computations. For a GPT-3 (175B) model, this means **a 70% activation memory reduction at a 2.7% compute cost**.
+- **Selective:** In general, we can do better than full. The authors of the recomputation paper[^16] did a detailed analysis studying which activations grow the largest and have the cheapest recomputation cost in terms of floating-point operations per second (FLOPS). It turns out that the attention computations fall in that category, and thus we can usually discard them and focus on checkpointing the expensive feedforward computations. For a GPT-3 (175B) model, this means **a 70% activation memory reduction at a 2.7% compute cost**.
 
 Let’s see how drastically recomputation strategies can reduce the memory footprint in practice, and how selective recomputation strikes a nice balance between memory savings and recomputation cost:
 
@@ -231,3 +231,17 @@ The trace helps identify bottlenecks like:
 Understanding these patterns is crucial for optimizing distributed training performance. For example, the trace will clearly show if gradient synchronization is properly overlapped with backward computation, as we'll discuss later.
 
 Now let’s get a larger workstation with a couple of GPUs and start investigating our first scaling technique, called ***data parallelism*** - which, as we'll see, is just a parallel version of gradient accumulation.
+
+
+---
+
+## References
+
+[^13]: Weilin Cai and Juyong Jiang and Fan Wang and Jing Tang and Sunghun Kim and Jiayi Huang. **A Survey on Mixture of Experts**. 2024. [Link](https://arxiv.org/abs/2407.06204). [arXiv:2407.06204](https://arxiv.org/abs/2407.06204). 
+
+[^14]: Dmitry Lepikhin and HyoukJoong Lee and Yuanzhong Xu and Dehao Chen and Orhan Firat and Yanping Huang and Maxim Krikun and Noam Shazeer and Zhifeng Chen. **GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding**. 2020. [Link](https://arxiv.org/abs/2006.16668). [arXiv:2006.16668](https://arxiv.org/abs/2006.16668).
+
+[^15]: Tri Dao and Daniel Y. Fu and Stefano Ermon and Atri Rudra and Christopher Ré. **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness**. 2022. [Link](https://arxiv.org/abs/2205.14135). [arXiv:2205.14135](https://arxiv.org/abs/2205.14135). 
+
+[^16]: Houwen Peng and Kan Wu and Yixuan Wei and Guoshuai Zhao and Yuxiang Yang and Ze Liu and Yifan Xiong and Ziyue Yang and Bolin Ni and Jingcheng Hu and Ruihang Li and Miaosen Zhang and Chen Li and Jia Ning and Ruizhe Wang and Zheng Zhang and Shuguang Liu and Joe Chau and Han Hu and Peng Cheng. **FP8-LM: Training FP8 Large Language Models**. 2023. [Link](https://arxiv.org/abs/2310.18313). [arXiv:2310.18313](https://arxiv.org/abs/2310.18313).
+

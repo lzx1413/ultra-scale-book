@@ -143,7 +143,7 @@ Let’s have a closer look how much we can save with the partitioning of each Ze
 
 #### Memory usage revisited
 
-[Earlier](#memory_usage_in_transformers), we discussed the memory usage of optimizer states, gradients, and parameters during standard training. Let's call our model's parameter count $\Psi$ (previously this was $N$, but here we use the original ZeRO paper's[] notation). In mixed precision training (discussed further [later in the book](#mixed_precision_training)) with the Adam optimizer, the memory usage for each item we need to store is:
+[Earlier](#memory_usage_in_transformers), we discussed the memory usage of optimizer states, gradients, and parameters during standard training. Let's call our model's parameter count $\Psi$ (previously this was $N$, but here we use the original ZeRO paper's[^12] notation). In mixed precision training (discussed further [later in the book](#mixed_precision_training)) with the Adam optimizer, the memory usage for each item we need to store is:
 
 - Model’s parameters (half precision; i.e., BF16/FP16): $2\Psi$
 - Model’s gradients (half precision; i.e., BF16/FP16): $2\Psi$
@@ -250,3 +250,9 @@ However, there are some limits here: DP only works if a layer of the model fits 
 To overcome this issue, it's time to examine a new, orthogonal axis of parallelism - ***tensor parallelism (TP)***. Unlike ZeRO-3, which relies on heavy parameter communication, TP proposes to shard parameters, gradients, optimizer states, AND activations across devices without requiring any communication of model parameters between GPUs.
 
 What? How is this even possible?! Let's explore this seemingly magical approach together. 🙂
+
+
+---
+
+## References
+
