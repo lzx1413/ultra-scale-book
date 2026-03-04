@@ -105,9 +105,7 @@ While data parallelism nicely overlaps the all-reduce gradient synchronization w
 
 We can see this happening in practice with some benchmarks:
 
-<iframe src="fragments/dp_scaling.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/dp_scaling.html)*
+> **[📊 Interactive Visualization: Dp Scaling](fragments/dp_scaling.html)**
 
 As shown here, above some limit, our throughput starts to drop quite significantly while the memory usage per GPU stays constant and is not affected by adding more DP ranks.
 
@@ -115,9 +113,7 @@ Data parallelism was our first (simple) strategy to scale training across more G
 
 The keen reader has already probably noted, however, that this assumes that we can fit at least one input sample forward pass ($mbs$=1) into GPU memory. This is not always the case! As we can see, larger models often don’t fit into a single GPU, even with activation recomputation activated:
 
-<iframe src="fragments/dp_ourjourney_memoryusage.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/dp_ourjourney_memoryusage.html)*
+> **[📊 Interactive Visualization: Dp Ourjourney Memoryusage](fragments/dp_ourjourney_memoryusage.html)**
 
 We've also seen that data parallelism starts to have some limiting communication overhead above a certain level of scaling. Do we have other options for these larger models or large batch sizes? We do have some solutions, thankfully - they involve either moving some tensors to the CPU or splitting the weights/gradients/optimizer states tensors across GPU devices.
 
@@ -243,9 +239,7 @@ Let’s summarize our journey into DP and ZeRO so far. We've seen that we can in
 
 However, there are some limits here: DP only works if a layer of the model fits in a single GPU, and ZeRO can only partition the parameters, gradients, and optimizer states, not the activation memory! Recall from [the activation memory discussion](#memory_usage_in_transformers) that this part of the memory scales with sequence length and batch size. We could just limit those, but in practice we don’t want to be limited by hardware to train with only a short sequence length.
 
-<iframe src="fragments/zero3_memoryusage.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/zero3_memoryusage.html)*
+> **[📊 Interactive Visualization: Zero3 Memoryusage](fragments/zero3_memoryusage.html)**
 
 To overcome this issue, it's time to examine a new, orthogonal axis of parallelism - ***tensor parallelism (TP)***. Unlike ZeRO-3, which relies on heavy parameter communication, TP proposes to shard parameters, gradients, optimizer states, AND activations across devices without requiring any communication of model parameters between GPUs.
 

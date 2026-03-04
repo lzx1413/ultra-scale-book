@@ -284,7 +284,7 @@ We know that instability increases as learning rates rise for a fixed model size
 
 Here is an example of a typically divergent loss curve for FP8 training:
 
-<iframe src="assets/data/fp8/fp8_training_loss_curves.html" width="100%" height="400" frameborder="0"></iframe>
+> **[📊 Interactive Visualization: Fp8 Training Loss Curves](assets/data/fp8/fp8_training_loss_curves.html)**
 
 *[Open interactive visualization](assets/data/fp8/fp8_training_loss_curves.html)*
 

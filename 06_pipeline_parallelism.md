@@ -8,9 +8,7 @@ To add a podcast feeling to your reading experience, feel free to listen to the 
 
 In the ["Tensor Parallelism"](#tensor-parallelism) section, we saw that trying to scale tensor parallelism past the number of GPUs on a single node - typically 4 or 8 - forces us to use lower-bandwidth network communication, which can significantly impair performance. We can see the effects of this inter-node communication clearly in the all-reduce operation when we benchmark it on our cluster across several nodes (each node here has 8 GPUs):
 
-<iframe src="fragments/pp_comm_bandwidth.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/pp_comm_bandwidth.html)*
+> **[📊 Interactive Visualization: Pp Comm Bandwidth](fragments/pp_comm_bandwidth.html)**
 
 Inter-node communication bandwidth measurements across different node counts, showing median (lines) and 5th-95th percentile ranges (shaded areas) for all-reduce, all-gather, and reduce-scatter operations
 
@@ -18,9 +16,7 @@ Sequence and context parallelism can help for long sequences, but they don’t h
 
 Pipeline parallelism is a simple but powerful technique - we split our model's layers across multiple GPUs! For example, if we have 8 GPUs, we could put layers 1-4 on GPU 1, layers 5-8 on GPU 2, and so on. This way, each GPU only needs to store and process a portion of the model's layers, significantly reducing the memory requirements per GPU. Let's see the effect of pipeline parallelism in action on the memory usage for an 8B parameter model:
 
-<iframe src="fragments/pp_memoryusage.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/pp_memoryusage.html)*
+> **[📊 Interactive Visualization: Pp Memoryusage](fragments/pp_memoryusage.html)**
 
 Looking at the figure above, we notice something interesting: while the model parameters are nicely split across GPUs, the activation memory remains the same on each GPU! which means we don't save any activation memory with this approach.
 
@@ -131,9 +127,7 @@ $$\begin{aligned}
 
 So, we can now decrease the bubble by adding micro-batches and interleaved stages - but note that quantitatively, the amount of communication also increases by $v$ so it’s a trade-off. In the following plot, you can see several configurations for a PP setup with $p=8$, where the special case of $m=1, v=1$ corresponds to naive pipeline parallelism, the configurations with $v=1$ are AFAB or 1F1B setups, and the $v \neq 1$ cases are interleaved configurations.
 
-<iframe src="fragments/pp_bubblesize.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/pp_bubblesize.html)*
+> **[📊 Interactive Visualization: Pp Bubblesize](fragments/pp_bubblesize.html)**
 
 Scheduling also becomes more complex here, as we have to decide on a given GPU and at a given moment whether we are prioritizing earlier micro-batches going through later layers – meaning that we close the forward and backward loops as fast as possible (the “depth-first” approach, which prioritizes getting batches out of the model as fast as possible) – or later micro-batches going through earlier layers (the “breadth-first” approach, which prioritizes filling in the pipeline as much as possible). This choice is explained in detail in the "Breadth-Fist Pipeline Parallelism" paper[].
 

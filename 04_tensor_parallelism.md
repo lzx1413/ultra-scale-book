@@ -78,9 +78,7 @@ Tensor parallelism does help reduce activation memory for the matrix multiplicat
 
 Let's take a better look at the trade-off as we scale the TP degree:
 
-<iframe src="fragments/tp_scaling.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/tp_scaling.html)*
+> **[📊 Interactive Visualization: Tp Scaling](fragments/tp_scaling.html)**
 
 While increasing TP leads to reduced per-GPU throughput (left), it enables processing of larger batch sizes (right), illustrating the trade-off between computational efficiency and memory availability in distributed training.
 
@@ -88,9 +86,7 @@ In practice, as we see in the lefthand plot above, the communication overhead of
 
 This being said, tensor parallelism provides important benefits for memory usage by distributing model parameters, gradients, optimizer states, and activations (to some extent) across GPUs. Let's examine this effect on a 70B parameter model:
 
-<iframe src="fragments/tp_memoryusage.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/tp_memoryusage.html)*
+> **[📊 Interactive Visualization: Tp Memoryusage](fragments/tp_memoryusage.html)**
 
 Increasing tensor parallelism reduces the memory needed for model parameters, gradients, and optimizer states on each GPU to the point where we can start fitting a larger model onto a single node of 8 GPUs.
 
@@ -199,9 +195,7 @@ $s$: **reduce-scatter** to sharded |
 
 By using sequence parallelism, we can achieve even greater activation memory savings, allowing us to push our batch size and sequence length further than would be possible with tensor parallelism alone. Let's see what that means for our previous 70B model example:
 
-<iframe src="fragments/tp_sp_memoryusage.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/tp_sp_memoryusage.html)*
+> **[📊 Interactive Visualization: Tp Sp Memoryusage](fragments/tp_sp_memoryusage.html)**
 
 We've again strongly reduced the maximum memory usage per GPU, allowing us to fit sequence lengths of 16k tokens with TP+SP=16 - an improvement over the vanilla TP case! (TP=16 is still a bit large, as we saw in the previous section, but we'll see how we can improve this in the next section.)
 
@@ -215,9 +209,7 @@ Just like vanilla TP, TP+SP can’t easily be overlapped with compute, which mak
 
 We can benchmark how this communication overhead becomes increasingly problematic as we scale up tensor parallelism. Let’s measure the throughput and memory utilization as we scale TP with SP for a 3B parameter model with a sequence length of 4,096:
 
-<iframe src="fragments/tp_sp_scaling.html" width="100%" height="400" frameborder="0" scrolling="no"></iframe>
-
-*[Open interactive visualization](fragments/tp_sp_scaling.html)*
+> **[📊 Interactive Visualization: Tp Sp Scaling](fragments/tp_sp_scaling.html)**
 
 Again, there's a trade-off between computational efficiency (left) and memory capacity (right). While higher degrees of parallelism enable processing of significantly larger batch sizes by reducing the activation memory, they also reduce per-GPU throughput, in particular above a threshold corresponding to the number of GPUs per node.
 
