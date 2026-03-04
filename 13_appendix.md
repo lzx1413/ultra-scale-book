@@ -10,7 +10,7 @@ Throughout this book, we've scaled LLM training from one to hundreds of GPUs. Th
 
 The general setup is that we have a number of independent nodes, which could be CPU cores, GPUs, or compute nodes. Each performs some computation, and then we want to communicate the result or parts of it to the other nodes for the next computation step ($t+1$).
 
-![image.png](/ultra-scale-book/assets/images/a0_general.png)
+![image.png](assets/images/a0_general.png)
 
 Maybe we need to send the result from one node to all other nodes, or to sum all the intermediate results from each node to report the overall result. Usually, there is one node with an elevated status that plays a central role, here denoted with *root*, that is the target or source of some operations. Let’s start with one of the simplest primitives: a Broadcast operation.
 
@@ -18,7 +18,7 @@ Maybe we need to send the result from one node to all other nodes, or to sum all
 
 A very common pattern is that you have some data on node 1 and you want to share it with all the other nodes so they can do some computation with the data. The Broadcast operation does just that:
 
-![image.png](/ultra-scale-book/assets/images/a0_broadcast.png)
+![image.png](assets/images/a0_broadcast.png)
 
 Collective operations are provided natively by PyTorch, so we can easily write a small example that demonstrates how broadcasting works. We first need to initialize a process group with `dist.initi_process_group`, which sets up the communication backend (we’ll talk about NCCL later). It determines how many workers (a.k.a. nodes) exist and assigns a rank to each one (which we can get with `dist.get_rank`). Finally, it establishes a connection between the workers.
 
@@ -32,7 +32,7 @@ Great, seems like it works as expected. Note that the rank messages can be print
 
 Reduce patterns are among the most fundamental patterns in distributed data processing. The idea is that you want to combine the data present on each node through a function `f()`, which may perform, for instance, summation or averaging. In the Reduce paradigm the result is sent to the root node only, whereas in the AllReduce case the result is broadcast to all nodes:
 
-![image.png](/ultra-scale-book/assets/images/a0_reduce_allreduce.png)
+![image.png](assets/images/a0_reduce_allreduce.png)
 
 Of course, there's no magic “free-flying” node that can perform this operation itself; generally, each node does a partial computation, with the nodes organized in a ring or tree structure. Here’s a simple example: let’s say we need to compute a sum of numbers on each nodes and our nodes are connected in a ring pattern. The first node sends its number to a neighbor, which adds its number to the received number before forwarding it to the next neighbor. At the end of a round through the ring of nodes, the first node will receive the total sum.
 
@@ -50,7 +50,7 @@ Now let’s turn to our next distributed communication operation. In many real c
 
 Gather and AllGather are quite similar to the Broadcast operation in that they allow distributing data among nodes without modification. The main difference to Broadcast is that there is not one value we need to share from one node to all other nodes; instead, each node has an individual chunk of data, and we want to either gather all the data on one node (in the case of Gather) or gather all the data on all nodes (in the case of AllGather). A picture being worth a thousand words, let’s take a look:
 
-![image.png](/ultra-scale-book/assets/images/a0_gather_allgather.png)
+![image.png](assets/images/a0_gather_allgather.png)
 
 The dashed lines indicate that some data actually doesn’t move at all (since it’s already present on the node).
 
@@ -70,7 +70,7 @@ As the name suggests, the goal of the Scatter operation is to take data on one n
 
 The ReduceScatter pattern is slightly more complex. As in the AllReduce case , you apply an operation on the data from all nodes. But unlike AllReduce where each node receives the full output tensor, in ReduceScatter each node only receives a slice of the output tensor. The following image illustrates the difference between these operations:
 
-![image.png](/ultra-scale-book/assets/images/a0_scatter_reducescatter.png)
+![image.png](assets/images/a0_scatter_reducescatter.png)
 
 The Scatter operation is written in code as the opposite of Gather: instead of preparing a list of tensors as a target, we prepare the source data as a list of tensors we want to distribute. We also need to specify the `src`:
 
@@ -91,11 +91,11 @@ Next, let's have a quick look at a common implementation of AllReduce that uses 
 
 Let’s illustrate this with the following gifs, where we have 5 GPUs, each with a tensor of length 5. The first animation shows the ReduceScatter step, where, at the end, each GPU receives the reduced results for a specific chunk of data (the orange rectangle).
 
-![image.png](/ultra-scale-book/assets/images/a0_reduce_scatter.gif)
+![image.png](assets/images/a0_reduce_scatter.gif)
 
 The next animation shows the AllGather step, where, at the end, each GPU obtains the full results of the AllReduce operation:
 
-![image.png](/ultra-scale-book/assets/images/a0_all_gather.gif)
+![image.png](assets/images/a0_all_gather.gif)
 
 You may have noticed that each of the $N$ GPUs sends and receives values $N-1$ times during both the ReduceScatter and AllGather steps. Each GPU sends $\frac{K}{N}$ values per transfer, where $K$ is the total number of values in the array being summed across the GPUs. Therefore, the total amount of data transferred to and from each GPU is $2 \times (N-1) \times \frac{K}{N}$. When $N$ (the number of GPUs) is large, the total amount of data transferred to and from each GPU is approximately $2 \times K$, where $K$ is the total number of parameters.
 
@@ -112,7 +112,7 @@ You've now seen the main building blocks of distributed operations - but before 
 
 ***Barrier*** is a simple operation to synchronize all nodes. A barrier is not lifted until all nodes have reached it. Only then are the nodes allowed to continue with further computations:
 
-![image.png](/ultra-scale-book/assets/images/a0_barrier.png)
+![image.png](assets/images/a0_barrier.png)
 
 We can easily simulate delayed nodes by setting up a different sleep time on each node and seeing how long it takes for all of them to pass the barrier:
 
@@ -145,7 +145,7 @@ A more efficient approach to profiling is to utilize the PyTorch profiler, as [e
 
 This would print aggregated profiling results sorted by the total CUDA time, and the output would be:
 
-![image.png](/ultra-scale-book/assets/images/a1_kernels.png)
+![image.png](assets/images/a1_kernels.png)
 
 You can also try to inspect the trace, as we previously mentioned, on *chrome://tracing/*.
 
@@ -155,7 +155,7 @@ If you're new to this tool, you can navigate the trace by using the right and le
 
 After zooming in, you can observe the flow of operations when calling `layer_norm` in this trace:
 
-![image.png](/ultra-scale-book/assets/images/a1_profile_trace.png)
+![image.png](assets/images/a1_profile_trace.png)
 
 The sequence begins in the CPU (the upper section) with `aten::layer_norm`, progressing to `aten::native_layer_norm` and then transitioning to `cudaLaunchKernel`. From there, we move on to the GPU, where the `vectorized_layer_norm_kernel` kernel is called.
 
@@ -169,7 +169,7 @@ where *layer_norm.py* is a straightforward file that executes the layer normaliz
 
 If you then open the file *output.ncu-rep* with Nsight Compute, you will have a view that looks like this, with clear warnings about compute and memory utilization and tips on how to make the kernel better at balancing compute and memory and achieve maximal occupancy:
 
-![image.png](/ultra-scale-book/assets/images/a1_ncu.png)
+![image.png](assets/images/a1_ncu.png)
 
 #### CPP extension
 

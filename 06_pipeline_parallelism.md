@@ -8,7 +8,7 @@ To add a podcast feeling to your reading experience, feel free to listen to the 
 
 In the ["Tensor Parallelism"](#tensor-parallelism) section, we saw that trying to scale tensor parallelism past the number of GPUs on a single node - typically 4 or 8 - forces us to use lower-bandwidth network communication, which can significantly impair performance. We can see the effects of this inter-node communication clearly in the all-reduce operation when we benchmark it on our cluster across several nodes (each node here has 8 GPUs):
 
-> **[📊 Interactive Visualization: Pp Comm Bandwidth](/ultra-scale-book/fragments/pp_comm_bandwidth.html)**
+> **[📊 Interactive Visualization: Pp Comm Bandwidth](fragments/pp_comm_bandwidth.html)**
 
 Inter-node communication bandwidth measurements across different node counts, showing median (lines) and 5th-95th percentile ranges (shaded areas) for all-reduce, all-gather, and reduce-scatter operations
 
@@ -16,7 +16,7 @@ Sequence and context parallelism can help for long sequences, but they don’t h
 
 Pipeline parallelism is a simple but powerful technique - we split our model's layers across multiple GPUs! For example, if we have 8 GPUs, we could put layers 1-4 on GPU 1, layers 5-8 on GPU 2, and so on. This way, each GPU only needs to store and process a portion of the model's layers, significantly reducing the memory requirements per GPU. Let's see the effect of pipeline parallelism in action on the memory usage for an 8B parameter model:
 
-> **[📊 Interactive Visualization: Pp Memoryusage](/ultra-scale-book/fragments/pp_memoryusage.html)**
+> **[📊 Interactive Visualization: Pp Memoryusage](fragments/pp_memoryusage.html)**
 
 Looking at the figure above, we notice something interesting: while the model parameters are nicely split across GPUs, the activation memory remains the same on each GPU! which means we don't save any activation memory with this approach.
 
@@ -36,7 +36,7 @@ But you may be starting to catch a glimpse of the troubles to come: “sequentia
 
 Indeed, reader! The main challenge in pipeline parallelism is how to efficiently circumvent the sequential nature of PP to keep our GPUs busy at all times and avoid having one GPU computing while the others are waiting. Here's how our GPU utilization looks when doing a naive and simple forward and backward pass through the model (here, the numbers indicate the model layers):
 
-![image.png](/ultra-scale-book/assets/images/pp_afab.svg)
+![image.png](assets/images/pp_afab.svg)
 
 An example of pipeline parallelism for a model with 16 layers distributed across 4 GPUs. The numbers correspond to the layer IDs.
 
@@ -54,7 +54,7 @@ Thankfully, various pipeline parallelism schemes have been designed to reduce th
 
 Let’s take a first tool out of our toolbox and think about splitting our batch into smaller bite-sized portions that can be processed in parallel (or almost), like we did before in the DP approach, for instance. Now, when the second GPU is busy processing micro-batch 1, the first GPU can already start processing micro-batch 2. Here is a schedule using eight micro-batches:
 
-![pp_afab2.svg](/ultra-scale-book/assets/images/pp_afab2.svg)
+![pp_afab2.svg](assets/images/pp_afab2.svg)
 
 The above schedule is called the ***all forward, all backward (AFAB)*** schedule, as we first do all the forward passes and then all the backward passes. The advantage is that forward and backward steps are still generally sequential, so we're preserving the general organization of our model training code. This PP implementation is one of the simplest to implement.
 
@@ -79,7 +79,7 @@ Since the memory explosion is triggered by the activations we store for the back
 
 This schedule is called ***one forward, one backward (1F1B)*** because the middle/steady state involves alternately performing one forward and one backward pass. The general idea is to start performing the backward pass as soon as possible. The schedule looks like this:
 
-![image.png](/ultra-scale-book/assets/images/pp_1f1b.svg)
+![image.png](assets/images/pp_1f1b.svg)
 
 If you count carefully, you'll see that the bubble still has the same size, so our training efficiency is not significantly improved. However, we only need to store activations for $p$ micro-batches (where $p$ is the degree of pipeline parallelism) instead of $m$ (where $m$ is the number of micro-batches), which can reduce the activation memory explosion we had in the AFAB schedule. As a consequence, we can add more micro-batches, which then will actually reduce the bubble.
 
@@ -96,7 +96,7 @@ You can find a full implementation of 1F1B in Picotron as well:
 
 Let's take a look at how the 1F1B pipeline parallelism schedule scales in practice with some benchmarks on our cluster:
 
-![Throughput scaling of pipeline parallelism with varying micro-batch sizes](/ultra-scale-book/assets/images/pp_1f1b_scaling.png)
+![Throughput scaling of pipeline parallelism with varying micro-batch sizes](assets/images/pp_1f1b_scaling.png)
 
 On the left, with a number of micro-batches equal to or less than the PP degree minus one ($m = p - 1$), we see how detrimental the pipeline bubble can be - performance is low and even drops as we scale PP. The righthand plot shows that using many more micro-batches than the PP degree ($m = 32 \gg p - 1$) helps improve low-PP-degree performance, though it's still limited at very large PP degrees. In practice, it's not possible to arbitrarily increase the number of micro-batches to maintain the ratio of $m \gg p - 1$ since we're ultimately constrained by the target global batch size. With a maximal possible number of micro-batches as we add more PP degrees, we'll ultimately have to increase the bubble size according to $r_{bubble} = \frac{p - 1}{m}$.
 
@@ -114,7 +114,7 @@ Up to now, we’ve sliced our model naively along the model depth dimensions, ho
 
 This can be seen in general as a kind of “looping pipeline” where a micro-batch will move in circles from one GPU to the next as it goes through the forward pass through the model. Let's take a look at how this works:
 
-![pp_1f1b_interleaved.svg](/ultra-scale-book/assets/images/pp_1f1b_interleaved.svg)
+![pp_1f1b_interleaved.svg](assets/images/pp_1f1b_interleaved.svg)
 
 An example of interleaved pipeline parallelism for a model with layers distributed across 4 GPUs. Numbers still correspond to the micro-batch IDs, but for clarity we've colored the first and last layers of the model differently to illustrate how layers are spread across GPUs.
 
@@ -127,13 +127,13 @@ $$\begin{aligned}
 
 So, we can now decrease the bubble by adding micro-batches and interleaved stages - but note that quantitatively, the amount of communication also increases by $v$ so it’s a trade-off. In the following plot, you can see several configurations for a PP setup with $p=8$, where the special case of $m=1, v=1$ corresponds to naive pipeline parallelism, the configurations with $v=1$ are AFAB or 1F1B setups, and the $v \neq 1$ cases are interleaved configurations.
 
-> **[📊 Interactive Visualization: Pp Bubblesize](/ultra-scale-book/fragments/pp_bubblesize.html)**
+> **[📊 Interactive Visualization: Pp Bubblesize](fragments/pp_bubblesize.html)**
 
 Scheduling also becomes more complex here, as we have to decide on a given GPU and at a given moment whether we are prioritizing earlier micro-batches going through later layers – meaning that we close the forward and backward loops as fast as possible (the “depth-first” approach, which prioritizes getting batches out of the model as fast as possible) – or later micro-batches going through earlier layers (the “breadth-first” approach, which prioritizes filling in the pipeline as much as possible). This choice is explained in detail in the "Breadth-Fist Pipeline Parallelism" paper[].
 
 You now have all the elements to understand the pipeline parallelism approach in Llama 3.1, which uses a 1F1B setup with interleaved stages and a priority setting tunable between depth-first and breadth-first:
 
-![pp_llama3.1_schedule.png](/ultra-scale-book/assets/images/pp_llama3.1_schedule.png)
+![pp_llama3.1_schedule.png](assets/images/pp_llama3.1_schedule.png)
 
 However, we haven’t reached the end of the possible pipeline schedules, and recently some methods have been proposed to **reduce the bubble to virtually zero**! These techniques were, for instance, used in the DeepSeek-V3/R1 implementation[]. Piqued your curiosity? Let’s have a final quick look at these magical schedules before we leave the world of pipeline parallelism!
 
@@ -145,17 +145,17 @@ Let’s briefly see how this can work by summarizing Sea AI Lab's zero bubble wo
 
 While the output of $B$, the backward pass for the inputs, is necessary for performing the backward pass of the lower layers, the backward pass of the weights, $W$, is not and generally only needs to be performed before the optimizer step. We can see that in the following diagram (from the Zero Bubble paper):
 
-![image.png](/ultra-scale-book/assets/images/pp_zerobubble_compgraph.png)
+![image.png](assets/images/pp_zerobubble_compgraph.png)
 
 This means $W$ can be flexibly scheduled anywhere after the corresponding $B$ of the same stage. This allows for strategic placement of $W$ to fill the pipeline bubbles. The ZB-H2 schedule at the top right is an example of a (theoretical) schedule with zero bubble taking advantage of this fine-grained decomposition.
 
-![image.png](/ultra-scale-book/assets/images/pp_zerobubble_ppschedule.png)
+![image.png](assets/images/pp_zerobubble_ppschedule.png)
 
 On the top (Figure 2 from the Zero Bubble paper): the classical 1F1B schedule, interleaving forward and backward passes but keeping a coarse-grained backward pass. On the bottom (Figure 3 from the Zero Bubble paper): two handcrafted schedules splitting the backward pass into finer-grained $B$ and $W$ operations. The lower schedule is an example of a (theoretical) zero bubble schedule taking advantage of this fine-grained decomposition.
 
 DeepSeek’s DualPipe, introduced with its V3 technical report [], is an extension of this decomposed approach to the additional case of two streams propagating from both ends of the PP dimension, with these streams being interleaved to further minimize idle time in the GPUs. This schedule is displayed in the following scheduling graph - as you can see, it's even more complex than the previous ones:
 
-![image.png](/ultra-scale-book/assets/images/pp_zerobubble_dualpipe.png)
+![image.png](assets/images/pp_zerobubble_dualpipe.png)
 
 In general, fully optimizing such complex schedules involves carefully measuring the duration of the various fine-grained operations and solving an Integer Linear Programming (ILP) problem to minimize the final bubble time. (See, for instance, the Zero Bubble paper[] for a discussion of the heuristics and algorithms used to perform such scheduling.) As a result, the zero bubble and DualPipe schedules are too complex for us to give code snippets here, but you should have a general idea of the concepts involved.
 

@@ -8,7 +8,7 @@ This is the last parallelism method we're going to discuss. Before tackling it, 
 
 The Mixture of Experts paradigm has recently gained traction and visibility with models such as GPT-4, Mixtral[], and DeepSeek-V3/R1. The basic idea is that instead of having a single feedforward module per layer, we can have several parallel modules and route tokens through them to be processed differently.
 
-![ep_moe.png](/ultra-scale-book/assets/images/ep_moe.png)
+![ep_moe.png](assets/images/ep_moe.png)
 
 Illustration of an MoE layer taken from the Switch Transformers paper[]
 
@@ -16,7 +16,7 @@ The design of MoE layers makes it easy to implement parallelism across the exper
 
 In practice, EP is typically used in conjunction with other forms of parallelism, such as data parallelism. This is because EP only affects the MoE layers and doesn't shard the input tokens (unlike context parallelism, which shards tokens along the sequence length dimension). This means our GPUs would be doing redundant computation for all the non-MoE blocks if we only used EP. By combining EP with DP, we can efficiently shard both the experts and the input batches across our GPUs, as you can see in the simplified diagram below:
 
-![ep_schema.png](/ultra-scale-book/assets/images/ep_schema.png)
+![ep_schema.png](assets/images/ep_schema.png)
 
 Source: "A Survey on Mixture of Experts"[]
 

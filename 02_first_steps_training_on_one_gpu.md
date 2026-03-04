@@ -62,7 +62,7 @@ So how can you quickly determine memory usage from these variables? One simple w
 
 Using the PyTorch profiler, we can understand how memory is allocated throughout training. We can see that memory utilization is not a static thing, but varies widely during training and during a training step:
 
-> **[📊 Interactive Visualization: Memory-Profile](/ultra-scale-book/fragments/memory-profile.html)**
+> **[📊 Interactive Visualization: Memory-Profile](fragments/memory-profile.html)**
 
 Clearly the first step looks very different from the subsequent ones, but before we get to that, let’s take a look at the general anatomy of a step. First the activations increase quickly as we do the forward pass, then during the backward pass the gradients build up, and as the backward pass propagates, the stored activations used to compute the gradients are progressively cleared. Finally, we perform optimization, during which we need all the gradients, and then update the optimizer states before we start the next forward pass.
 
@@ -136,7 +136,7 @@ For the exact derivation of the numbers, you can follow the original NVIDIA pape
 
 An interesting observation here is that memory usage is not static for a given model; rather, it scales linearly with the batch size and quadratically with the sequence length. This means the activation memory is the part that will blow up when we increase our batch size or train with longer sequences. We can use this equation to look at how memory usage changes for various sequence lengths, for example for Llama models (`bs=1`):
 
-> **[📊 Interactive Visualization: Memusage Activations](/ultra-scale-book/fragments/memusage_activations.html)**
+> **[📊 Interactive Visualization: Memusage Activations](fragments/memusage_activations.html)**
 
 These graphs tell a striking story: for short sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 2-4k tokens they start to take up a significant amount of memory, while usage for parameters, gradients, and optimizer states (as we’ll discuss later) is roughly independent of the sequence length and batch size.
 
@@ -157,7 +157,7 @@ There are a few strategies for selecting key activations to store:
 
 Let’s see how drastically recomputation strategies can reduce the memory footprint in practice, and how selective recomputation strikes a nice balance between memory savings and recomputation cost:
 
-> **[📊 Interactive Visualization: Memory-Recomputation](/ultra-scale-book/fragments/memory-recomputation.html)**
+> **[📊 Interactive Visualization: Memory-Recomputation](fragments/memory-recomputation.html)**
 
 Another trend that's clearly visible here is how the activations for long sequences play a bigger role for smaller models, so the effect of recomputation becomes even more noticeable.
 
@@ -191,7 +191,7 @@ $$bs = gbs = mbs \times grad\_acc$$
 
 Gradient accumulation allows us to effectively increase our batch size up to infinity (and beyond!) while the memory footprint stays constant. Gradient accumulation is also compatible with activation recomputation for further memory reductions.
 
-![image.png](/ultra-scale-book/assets/images/gradaccumulation_diag.png)
+![image.png](assets/images/gradaccumulation_diag.png)
 
 Gradient accumulation allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch's worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.
 
@@ -211,7 +211,7 @@ This generates a trace that we can visualize in TensorBoard or Chrome's trace vi
 - Multiple CUDA streams handling compute and communication in parallel
 - Kernel execution times and memory allocation
 
-![profile_trace_annotated.png](/ultra-scale-book/assets/images/profile_trace_annotated.png)
+![profile_trace_annotated.png](assets/images/profile_trace_annotated.png)
 
 Example trace showing a CPU threads launching kernels asynchronously on the GPU, with compute kernels and communication happening in parallel across different CUDA streams
 

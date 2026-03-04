@@ -40,7 +40,7 @@ On the other hand, ZeRO-1 and ZeRO-2, which focus on optimizer states and gradie
 
 **Tensor parallelism** (with **sequence parallelism**) is naturally complementary to and can be combined with both pipeline parallelism and ZeRO-3, as it relies on the distributive property of matrix multiplications, which allows weights and activations to be sharded and computed independently before being combined.
 
-![TP & SP diagram](/ultra-scale-book/assets/images/5d_nutshell_tp_sp.svg)
+![TP & SP diagram](assets/images/5d_nutshell_tp_sp.svg)
 
 The main reason we don't want to use TP only for parallelism is that, in practice, TP has two limitations (which we've discussed in previous sections). First, since its communication operations are part of the critical path of computation, it's difficult to scale well beyond a certain point, after which communication overhead begins to dominate. Second, unlike ZeRO and PP, which are model-agnostic, TP requires careful handling of activation sharding - sometimes along the hidden dimension (in the TP region) and sometimes along the sequence dimension (in the SP region) - making it more cumbersome to implement correctly and requiring model-specific knowledge to ensure proper sharding patterns throughout.
 
@@ -50,11 +50,11 @@ As a consequence, when combining parallelism strategies, TP will typically be ke
 
 CP specifically targets the challenge of training with very long sequences by sharding activations along the sequence dimension across GPUs. While most modules, like MLP and LayerNorm, can process these sharded sequences independently, attention blocks require communication since each token needs access to keys/values from the full sequence. As we saw in the [CP section](#context_parallelism), this is handled efficiently through Ring Attention patterns that overlap computation and communication. CP is particularly valuable when scaling to extreme sequence lengths (128k+ tokens) where, even when using full activation recomputation, the memory requirements for attention would be prohibitive on a single GPU.
 
-![CP diagram](/ultra-scale-book/assets/images/5d_nutshell_cp.svg)
+![CP diagram](assets/images/5d_nutshell_cp.svg)
 
 **Expert parallelism** specifically targets the challenge of training MoE models by sharding specialized "experts" across GPUs and dynamically routing tokens to relevant experts during computation. The key communication operations in EP are the "all-to-all" operations routing tokens to their assigned experts and gathering the results back. While this introduces some communication overhead, it enables scaling model capacity significantly since each token is only processed during inference (and training) by a much smaller fraction of the total parameters. In terms of distributed training/inference, partitioning experts across GPUs becomes relevant when models scales to a large number of experts.
 
-![EP diagram](/ultra-scale-book/assets/images/5d_nutshell_ep.svg)
+![EP diagram](assets/images/5d_nutshell_ep.svg)
 
 📝 Note
 
@@ -82,11 +82,11 @@ Now, what about gathering all the techniques we've seen into a single diagram co
 
 In this summary diagram, you will find illustrated activations and modules for a single transformer layer, in its MoE variant. We also illustrate the various directions of parallelism and the communication operations we've been discussing in the previous sections.
 
-![image.png](/ultra-scale-book/assets/images/5d_full.svg)
+![image.png](assets/images/5d_full.svg)
 
 We can also give a **full overview** of the memory savings for each of these strategies. We'll plot them with different sequence lengths as well as with selective (top) and full (bottom) recomputation so you can see how they all play with activations:
 
-![5Dparallelism_8Bmemoryusage.svg](/ultra-scale-book/assets/images/5Dparallelism_8Bmemoryusage.svg)
+![5Dparallelism_8Bmemoryusage.svg](assets/images/5Dparallelism_8Bmemoryusage.svg)
 
 Let's finish this section with a high-level view of all of these techniques, their main underlying ideas, and their major bottlenecks:
 
