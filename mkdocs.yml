@@ -3,7 +3,6 @@ site_description: The ultimate guide to training LLM on large GPU Clusters
 site_url: https://lzx1413.github.io/ultra-scale-book/
 repo_url: https://github.com/lzx1413/ultra-scale-book
 repo_name: lzx1413/ultra-scale-book
-docs_dir: .
 
 theme:
   name: material
