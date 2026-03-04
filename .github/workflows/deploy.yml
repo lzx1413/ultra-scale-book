@@ -34,6 +34,11 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build
 
+      - name: Copy fragments and assets
+        run: |
+          cp -r docs/fragments site/
+          cp -r docs/assets site/
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
