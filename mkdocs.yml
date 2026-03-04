@@ -45,17 +45,13 @@ nav:
   - "13. Appendix": 13_appendix.md
 
 markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
+  - pymdownx.highlight
   - pymdownx.inlinehilite
-  - pymdownx.snippets
   - pymdownx.superfences
   - pymdownx.arithmatex:
       generic: true
   - admonition
   - pymdownx.details
-  - pymdownx.tabbed:
-      alternate_tabs: true
   - attr_list
   - md_in_html
   - footnotes
@@ -63,7 +59,6 @@ markdown_extensions:
       permalink: true
 
 extra_javascript:
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 extra:
