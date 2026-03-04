@@ -1,0 +1,1190 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The ultimate guide to training LLM on large GPU Clusters">
+      
+      
+      
+        <link rel="canonical" href="https://lzx1413.github.io/ultra-scale-book/02_first_steps_training_on_one_gpu/">
+      
+      
+        <link rel="prev" href="../01_high_level_overview/">
+      
+      
+        <link rel="next" href="../03_data_parallelism/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>2. First Steps: Training on One GPU - The Ultra-Scale Playbook</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#first-steps-training-on-one-gpu" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-header__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            The Ultra-Scale Playbook
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              2. First Steps: Training on One GPU
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-nav__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    The Ultra-Scale Playbook
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_high_level_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. High-Level Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. First Steps: Training on One GPU
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. First Steps: Training on One GPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-steps-training-on-one-gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First Steps: Training on One GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First Steps: Training on One GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-usage-in-transformers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory usage in transformers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory usage in transformers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiling-the-memory-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiling the memory usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-for-weightsgradsoptimizer-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory for weights/grads/optimizer states
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-for-activations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory for activations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-recomputation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation recomputation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gradient-accumulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gradient accumulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gradient accumulation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiling-gpu-compute-and-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiling GPU compute and communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_data_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Data Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_tensor_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Tensor Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_context_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Context Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06_pipeline_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Pipeline Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_expert_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Expert Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_5d_parallelism_in_a_nutshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. 5D Parallelism in a Nutshell
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09_finding_best_training_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Finding the Best Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10_diving_into_gpus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Diving into the GPUs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11_conclusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Conclusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12_references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. References
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13_appendix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Appendix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-steps-training-on-one-gpu_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First Steps: Training on One GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First Steps: Training on One GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-usage-in-transformers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory usage in transformers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory usage in transformers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiling-the-memory-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiling the memory usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-for-weightsgradsoptimizer-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory for weights/grads/optimizer states
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-for-activations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory for activations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activation-recomputation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation recomputation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gradient-accumulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gradient accumulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gradient accumulation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#profiling-gpu-compute-and-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiling GPU compute and communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="first-steps-training-on-one-gpu">First Steps: Training on One GPU<a class="headerlink" href="#first-steps-training-on-one-gpu" title="Permanent link">&para;</a></h1>
+<p><em>From <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">The Ultra-Scale Playbook</a></em></p>
+<h2 id="first-steps-training-on-one-gpu_1">First Steps: Training on One GPU<a class="headerlink" href="#first-steps-training-on-one-gpu_1" title="Permanent link">&para;</a></h2>
+<p>If you fancy adding a podcast feeling to your reading experience, feel free to listen to the NotebookLM hosts discussing the first sections of this book as you're reading along.</p>
+<p>Let’s start by quickly reviewing the very basics of model training before we start to scale to many GPUs. When a model is trained on a single GPU, the training typically consists of three steps:</p>
+<ol>
+<li>A forward pass, which passes inputs through the model to yield its outputs</li>
+<li>A backward pass to compute the gradients</li>
+<li>An optimization step using the gradients to update the parameters</li>
+</ol>
+<p>It looks generally like this:</p>
+<p>In this figure, the boxes on the top line can be seen as successive layers inside a model (and the same for the last line). The pink boxes are the associated gradients for each of these layers, computed during the backward pass.</p>
+<p>The <strong><em>batch size</em></strong> (<span class="arithmatex">\(bs\)</span>) is one of the important hyperparameters for model training; it affects both model convergence and throughput.</p>
+<p>A small batch size can be useful early in training to quickly move through the training landscape to reach an optimal learning point. However, further along in the model training, small batch sizes will keep gradients noisy, and the model may not be able to converge to the most optimal final performance. At the other extreme, a large batch size, while giving very accurate gradient estimations, will tend to make less use of each training token, rendering convergence slower and potentially wasting compute resources. You can find a nice early discussion of this topic in OpenAI’s paper on large batch training[], or in section 4.2 of the MiniMax-01 <a href="https://filecdn.minimax.chat/_Arxiv_MiniMax_01_Report.pdf">technical report</a>.</p>
+<p>Batch size also affects the time it takes to train on a given text dataset: a small batch size will require more optimizer steps to train on the same amount of samples. Optimizer steps are costly (in compute time), and the total time to train will thus increase compared to using a larger batch size. That being said, note that the batch size can often be adjusted quite widely around the optimal batch size without major impact on the performance of the model - that is, the sensitivity of final model performance to the exact batch size value is usually rather low around the optimal batch size.</p>
+<p>In the LLM pretraining community, batch sizes are commonly reported in terms of tokens rather than number of samples (<span class="arithmatex">\(bst\)</span> = batch size tokens). This makes training numbers generally independent of the exact input sequence length used during the training.</p>
+<p>In the simplest case, training on a single machine, the <span class="arithmatex">\(bs\)</span> (in samples) and <span class="arithmatex">\(bst\)</span> can be computed from the model input sequence length (<span class="arithmatex">\(seq\)</span>) as follows:</p>
+<div class="arithmatex">\[bst=bs *seq\]</div>
+<p>From here onward we’ll show the formulas for the batch size in terms of samples, but you can always get its token unit counterpart by multiplying it with the sequence length.</p>
+<p>A sweet spot for recent LLM training is typically on the order of 4-60 million tokens per batch. The batch size and the training corpus size have been steadily increasing over the years: Llama 1 was trained with a batch size of ~4M tokens for 1.4 trillion tokens, while DeepSeek was trained with a batch size of ~60M tokens for 14 trillion tokens.</p>
+<p>We run into our first challenge when scaling the training of our model to these large batch sizes: <strong><em>out-of-memory (OOM) issues</em></strong>. What should we do when our GPU doesn’t have enough memory to hold a full batch of our target batch size?</p>
+<p>Let’s start by exploring what leads to the OOM issues in the first place. This will help us gain some useful intuitions on the memory requirements for training a model.</p>
+<h3 id="memory-usage-in-transformers">Memory usage in transformers<a class="headerlink" href="#memory-usage-in-transformers" title="Permanent link">&para;</a></h3>
+<p>When training a neural network model, we store several items in memory:</p>
+<ul>
+<li>Model weights</li>
+<li>Model gradients</li>
+<li>Optimizer states</li>
+<li>Activations needed to compute the gradients</li>
+</ul>
+<p>📝 Note</p>
+<p>You might think that you could compute the memory requirements for a model exactly, but there are a few additional memory occupants that make it hard to be precise:</p>
+<p>CUDA kernels typically require 1-2 GB of GPU memory, which you can quickly verify by running <code>import torch; torch.ones((1, 1)).to("cuda")</code> and then checking the GPU memory with <code>nvidia-smi</code>.
+Some memory is used for buffers and intermediate results, and there's some memory that can't be used due to fragmentation.</p>
+<div class="highlight"><pre><span></span><code>    We’ll neglect these last two contributors, as they are typically small and constant factors.
+</code></pre></div>
+<p>These items are stored as tensors, which come in different shapes and precisions. The <em>shapes</em> are determined by hyperparameters such as batch size, sequence length, model hidden dimensions, attention heads, vocabulary size, and potential model sharding, as we’ll see later. <em>Precision</em> refers to formats like FP32, BF16, or FP8, which respectively require 4, 2, or 1 byte to store each single value in the tensor. We will have a full discussion of the different precisions and their trade-offs in the <a href="#mixed_precision_training">"Mixed precision training"</a> section; for now, let's just keep in mind that the memory requirements for these various formats will be different, and that will impact the memory usage of the items we need to store.</p>
+<p>So how can you quickly determine memory usage from these variables? One simple way is to do this empirically and just measure it.</p>
+<h4 id="profiling-the-memory-usage">Profiling the memory usage<a class="headerlink" href="#profiling-the-memory-usage" title="Permanent link">&para;</a></h4>
+<p>Using the PyTorch profiler, we can understand how memory is allocated throughout training. We can see that memory utilization is not a static thing, but varies widely during training and during a training step:</p>
+<iframe src="/ultra-scale-book/fragments/memory-profile.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/memory-profile.html">Open full interactive visualization: Memory-Profile</a></em></p>
+<p>Clearly the first step looks very different from the subsequent ones, but before we get to that, let’s take a look at the general anatomy of a step. First the activations increase quickly as we do the forward pass, then during the backward pass the gradients build up, and as the backward pass propagates, the stored activations used to compute the gradients are progressively cleared. Finally, we perform optimization, during which we need all the gradients, and then update the optimizer states before we start the next forward pass.</p>
+<p>As mentioned, the first step looks different: the activations increase quickly and then plateau for a while. Why? In this first step, the PyTorch caching allocator does a lot of prep work, preparing memory allocations so that the subsequent steps don’t have to search for free memory blocks, which speeds them up (see <a href="https://zdevito.github.io/2022/08/04/cuda-caching-allocator.html">Zach’s blog</a>). After the first step we also see the optimizer states appearing, which generally offset the memory usage for further training steps.</p>
+<p>Now that we have a first view of memory, let’s see how scaling up training is often a question of maximizing compute efficiency while keeping the memory requirements of these various items (activations, parameters, gradients, optimizer states) within the memory constraints of the GPUs.</p>
+<h4 id="memory-for-weightsgradsoptimizer-states">Memory for weights/grads/optimizer states<a class="headerlink" href="#memory-for-weightsgradsoptimizer-states" title="Permanent link">&para;</a></h4>
+<p>Let's start with the first three items in our list: the model’s weights, gradients, and optimizer states. We can actually pretty easily estimate the memory needed for them.</p>
+<p>For a simple transformer LLM, the number of parameters is given by the <a href="https://michaelwornow.net/2024/01/18/counting-params-in-transformer">following formula</a>:</p>
+<div class="arithmatex">\[N = h * v + L * (12 * h^2 + 13 * h) + 2*h\]</div>
+<p>In that equation, <span class="arithmatex">\(h\)</span> is the hidden dimension, <span class="arithmatex">\(v\)</span> the vocabulary size, and <span class="arithmatex">\(L\)</span> the number of layers in the model. Note that looking at the equation, we can see that the term that will dominate with large hidden dimensions is the <span class="arithmatex">\(h^2\)</span> term, since it’s the only one growing quadratically as we scale the parameters.</p>
+<p>Memory requirements for the parameters and gradients are determined simply by multiplying the number of parameters by the number of bytes per parameter. In good old-fashioned full precision (FP32) training, both parameters and gradients require 4 bytes while the optimizer, if we use Adam, requires the momentum and variance to be stored, adding another 8 bytes per parameter (4 bytes each). In summary:</p>
+<div class="arithmatex">\[\begin{aligned}
+            &amp; m_{params} = 4 * N \\
+            &amp; m_{grad} = 4 * N \\
+            &amp; m_{opt} = (4+4) * N
+            \end{aligned}\]</div>
+<p>Now, let’s have a look at how things change if we use a lower precision. For stability reasons (see the section on <a href="#mixed_precision_training">mixed precision training</a> later in the book), we often don't use full low precision training but a mix of higher and lower precision called "mixed precision"[]. The default nowadays for mixed precision training is to generally use BF16 for most of the computations – requiring 2 bytes per parameter and gradient – as well as storing an additional copy of the model weights and gradients in FP32, making 12 bytes per parameter in total. In addition to the parameters and gradients, we need to store the optimizer states; for the Adam optimizer, this requires the momentum and the variance, usually stored in FP32 for numerical stability, each using 4 bytes.</p>
+<p>Here’s the summary:</p>
+<div class="arithmatex">\[\begin{aligned}
+                &amp; m_{params} = 2 * N \\ 
+                &amp; m_{grad} = 2 * N \\ 
+                &amp; m_{params\_fp32} = 4 * N  \\ 
+                &amp; m_{opt} = (4+4) * N
+            \end{aligned}\]</div>
+<p>📝 Note</p>
+<p>Some libraries store grads in FP32, which would require an additional <span class="arithmatex">\(m_{params\_fp32} = 4 * N\)</span> memory. This is done, for example, in Nanotron, because BF16 is lossy for smaller values and we always prioritize stability. See  <a href="https://github.com/microsoft/DeepSpeed/issues/1773">this DeepSpeed issue</a> for more information.</p>
+<p>📝 Note</p>
+<p>The FP32 copy of the parameters (<span class="arithmatex">\(m_{params\_fp32}\)</span>) is sometimes called the "master weights" in the literature and codebases.</p>
+<p>Interestingly, mixed precision training itself doesn’t save memory; it just distributes the memory differently across the three components, and in fact adds another 4 bytes over full precision training if we accumulate gradients in FP32. It’s still advantageous, though, as computing the forward/backward passes in half precision (1) allows us to use optimized lower precision operations on the GPU, which are faster, and (2) reduces the activation memory requirements during the forward pass, which as we saw in the graph above is a large part of the memory usage.</p>
+<p>Let’s get a general sense of how much memory we need for a model (with full and mixed precision giving the same overall values):</p>
+<table>
+<thead>
+<tr>
+<th><strong>Model parameters</strong></th>
+<th><strong>FP32 or BF16 w/o FP32 grad acc</strong></th>
+<th><strong>BF16 w/ FP32 grad acc</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1B</td>
+<td>16 GB</td>
+<td>20 GB</td>
+</tr>
+<tr>
+<td>7B</td>
+<td>112 GB</td>
+<td>140 GB</td>
+</tr>
+<tr>
+<td>70B</td>
+<td>1120 GB</td>
+<td>1400 GB</td>
+</tr>
+<tr>
+<td>405B</td>
+<td>6480 GB</td>
+<td>8100 GB</td>
+</tr>
+</tbody>
+</table>
+<p>Using FP8 training instead of BF16 would further decrease the memory usage, but it is less stable. This is a very active research topic (see <a href="https://x.com/xariusrke/status/1826669126955278401">this tweet</a>), and we’ll cover it in more detail later.</p>
+<p>As we can see, as soon as we reach <strong>7B</strong>(!), the memory requirements for the weights, gradients, and optimizer states already start to add up significantly and exceed the size of a typical GPU's memory (e.g., 80 GB for an H100 GPU).</p>
+<p>But for now, let’s stick with models that fit in a single GPU and take a look at the last big contributor to our memory budget: the activations.</p>
+<h4 id="memory-for-activations">Memory for activations<a class="headerlink" href="#memory-for-activations" title="Permanent link">&para;</a></h4>
+<p>The memory requirements for activations are a bit more complex to compute than for the weights, gradients, and optimizer states, in part because they depend on the inputs of the model. If you’re unsure why we even need to store activations for the backward pass, <a href="https://www.determined.ai/blog/act-mem-2">this blog post</a> gives a good quick refresher. After a careful inspection of how the backward pass is computed, we can estimate the total memory required for the activations in mixed precision. We arrive at the following equation:</p>
+<div class="arithmatex">\[m_{act} =  L \cdot seq \cdot bs \cdot h \cdot (34 + \frac{5 \cdot n_{heads} \cdot seq}{h})\]</div>
+<p>Here, <span class="arithmatex">\(L\)</span> is the number of layers, <span class="arithmatex">\(seq\)</span> the sequence length, <span class="arithmatex">\(bs\)</span> the batch size in samples, <span class="arithmatex">\(h\)</span> the hidden dimension of the model, and <span class="arithmatex">\(n_{heads}\)</span> the number of heads.</p>
+<p>For the exact derivation of the numbers, you can follow the original NVIDIA paper on recomputation [] - it essentially requires you to do some accounting of all the sizes of intermediate activations between each operation in a transformer layer.</p>
+<p>An interesting observation here is that memory usage is not static for a given model; rather, it scales linearly with the batch size and quadratically with the sequence length. This means the activation memory is the part that will blow up when we increase our batch size or train with longer sequences. We can use this equation to look at how memory usage changes for various sequence lengths, for example for Llama models (<code>bs=1</code>):</p>
+<iframe src="/ultra-scale-book/fragments/memusage_activations.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/memusage_activations.html">Open full interactive visualization: Memusage Activations</a></em></p>
+<p>These graphs tell a striking story: for short sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 2-4k tokens they start to take up a significant amount of memory, while usage for parameters, gradients, and optimizer states (as we’ll discuss later) is roughly independent of the sequence length and batch size.</p>
+<p>For large numbers of input tokens (i.e., large batch sizes/sequences), activations become by far the largest memory burden.</p>
+<p>Is there a way to tame this “activation explosion”? Good question, reader!</p>
+<p>It’s time to explain our first technique, called <strong><em>activation recomputation</em></strong>, which will help us cap the activation memory footprint - it's an essential tool in today’s large model training toolbox.</p>
+<h3 id="activation-recomputation">Activation recomputation<a class="headerlink" href="#activation-recomputation" title="Permanent link">&para;</a></h3>
+<p>The general idea behind activation recomputation – also called <em>gradient checkpointing</em> or <em>rematerialization</em> – is to discard some activations during the forward pass to save memory and spend some extra compute to recompute these on the fly during the backward pass. Without recomputation, we store every hidden state between two learnable operations (e.g., feedforward, LayerNorm, etc.), so that we can use them during the backward pass to compute gradients. When we use recomputation, we typically only store activations at a few key points in the model architecture, discarding the rest of the activations and recomputing them on the fly during the backward pass from the nearest saved activations. Basically, we perform a sub-part of the forward pass again, to trade off memory for compute. It generally looks like this:</p>
+<p>There are a few strategies for selecting key activations to store:</p>
+<ul>
+<li><strong>Full:</strong> We checkpoint activations at the transition point between each layer of the Transformer model. This is usually called the “full” strategy since it requires a forward pass through each layer, essentially adding a full forward pass during the backward pass. This strategy saves the most memory but is the most expensive one in terms of compute. It typically increases the compute cost and time by up to 30-40%, which is very noticeable.</li>
+<li><strong>Selective:</strong> In general, we can do better than full. The authors of the recomputation paper[] did a detailed analysis studying which activations grow the largest and have the cheapest recomputation cost in terms of floating-point operations per second (FLOPS). It turns out that the attention computations fall in that category, and thus we can usually discard them and focus on checkpointing the expensive feedforward computations. For a GPT-3 (175B) model, this means <strong>a 70% activation memory reduction at a 2.7% compute cost</strong>.</li>
+</ul>
+<p>Let’s see how drastically recomputation strategies can reduce the memory footprint in practice, and how selective recomputation strikes a nice balance between memory savings and recomputation cost:</p>
+<iframe src="/ultra-scale-book/fragments/memory-recomputation.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/memory-recomputation.html">Open full interactive visualization: Memory-Recomputation</a></em></p>
+<p>Another trend that's clearly visible here is how the activations for long sequences play a bigger role for smaller models, so the effect of recomputation becomes even more noticeable.</p>
+<p>📝 Note</p>
+<p>When you're measuring how efficient your training setup is at using your GPU/TPU/accelerator, you usually want to take recomputation into account to compute total FLOPs (floating-point operations) and compare this to the theoretical maximum FLOPS (floating-point operations per second) of the GPU/TPU/accelerator. Taking recomputation into account when calculating FLOPs for a training step gives a value called "hardware FLOPs," which is the real number of operations performed on the accelerator. Dividing this hardware FLOPs value by the duration of the training step (in seconds) gives you the actual FLOPS achieved. Then, dividing this achieved FLOPS by the maximum accelerator FLOPS yields the <strong><em>hardware FLOPS utilization (HFU)</em></strong>.</p>
+<p>However, what really matters at the end of the day is the total time needed to train a model on a given dataset. So, for example, when comparing various GPUs/TPUs/accelerators, if one of these provides enough memory to skip recomputation and thus performs fewer total operations (lower hardware FLOPs) but still trains faster, it should be rewarded, not punished. Thus, an alternative is to compute what is called <strong><em>model FLOPS utilization (MFU)</em></strong>, which, in contrast to HFU, only takes into account the required operations for the forward and backward passes through the model and does not include recomputation in the measured FLOPs. This value is thus more specific to the model than the training implementation.</p>
+<p>Most training frameworks these days use FlashAttention (covered further <a href="#flash_attention_1-3">later in the book</a>), which natively integrates activation recomputation in its optimization strategy by recomputing attention scores and matrices in the backward pass instead of storing them. Thus, most people using FlashAttention are already making use of selective recomputation.</p>
+<p>As you’ve now understood, activation recomputation slightly increases the number of FLOPS due to recomputation, while it significantly reduces memory access overhead.</p>
+<p>This trade-off is particularly advantageous on hardware with limited high-speed memory, like GPUs, as accessing memory is typically slower than performing computations. Despite the additional operations involved, the overall effect is thus often faster computation, in addition to the much lower memory footprint.</p>
+<p>Now that we’ve learned about recomputation, we can tame the activation memory usage we saw in the previous graphs!</p>
+<p>However, activations still have a linear dependence on the batch size, and all our profiles in the bar plots above were using <code>bs=1</code>, so as we move to larger batch sizes this might become an issue again. Fortunately, we have a second tool in our box - <strong><em>gradient accumulation</em></strong> to the rescue!</p>
+<h3 id="gradient-accumulation">Gradient accumulation<a class="headerlink" href="#gradient-accumulation" title="Permanent link">&para;</a></h3>
+<p>Gradient accumulation is a very straightforward method to avoid memory explosion that consists of splitting a batch into micro-batches. We then perform forward and backward passes successively on each micro-batch, compute the gradients, and, as the name suggests, sum the gradients of all micro-batches before we perform optimization. In practice, the optimization step is conducted not on the sum but on the average of the gradients, so that the result is independent of the number of gradient accumulation steps.</p>
+<p>Let’s call the batch size for each forward pass the <em>micro-batch size</em> (<span class="arithmatex">\(mbs\)</span>). We’ll refer to the overall batch size between each optimizer step as the <em>global batch size</em> (<span class="arithmatex">\(gbs\)</span>). If we do one optimizer step for each eight forward/backward passes, the global batch size will be eight times the micro-batch size.</p>
+<p>What we now call the global batch size thus corresponds to what we’ve called just the batch size up to this point, for simplicity (we're now making our terms more precise to avoid ambiguity).</p>
+<p>With gradient accumulation, the global batch size can be computed as follows:</p>
+<div class="arithmatex">\[bs = gbs = mbs \times grad\_acc\]</div>
+<p>Gradient accumulation allows us to effectively increase our batch size up to infinity (and beyond!) while the memory footprint stays constant. Gradient accumulation is also compatible with activation recomputation for further memory reductions.</p>
+<p><img alt="image.png" src="../assets/images/gradaccumulation_diag.png" /></p>
+<p>Gradient accumulation allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch's worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.</p>
+<p>One drawback, however, is that gradient accumulation requires multiple consecutive forward/backward passes per optimization step, thereby increasing the compute overhead and slowing down training. No free lunch!</p>
+<p>If you’ve been following carefully, though, you probably noticed that the forward/backward passes for each micro-batch can actually be run in parallel. Forward and backward passes are independent from each other, with independent input samples being the only difference. Seems like it’s time to start extending our training to more than one GPU!</p>
+<p>Before that, let's quickly see how we can visualize computation and communication with a short tour of one of the most useful tools in the distributed training toolbox: the <strong><em>profiler</em></strong>. This tool will be extremely useful to understand and validate how communications between GPUs and compute are happening and where the bottlenecks are.</p>
+<h4 id="profiling-gpu-compute-and-communication">Profiling GPU compute and communication<a class="headerlink" href="#profiling-gpu-compute-and-communication" title="Permanent link">&para;</a></h4>
+<p>PyTorch's <a href="https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">profiler</a> allows us to trace and visualize exactly what's happening on both the CPU and the GPU during training. It's natively integrated in PyTorch. Let's see how to use it:</p>
+<p>This generates a trace that we can visualize in TensorBoard or Chrome's trace viewer. The trace shows:</p>
+<ul>
+<li>A CPU threads launching kernels asynchronously on the GPU</li>
+<li>Multiple CUDA streams handling compute and communication in parallel</li>
+<li>Kernel execution times and memory allocation</li>
+</ul>
+<p><img alt="profile_trace_annotated.png" src="../assets/images/profile_trace_annotated.png" /></p>
+<p>Example trace showing a CPU threads launching kernels asynchronously on the GPU, with compute kernels and communication happening in parallel across different CUDA streams</p>
+<p>The trace helps identify bottlenecks like:</p>
+<ul>
+<li>Sequential compute and communication that could be overlapped</li>
+<li>Idle GPU time waiting for data transfers</li>
+<li>CUDA Syncs and memory movement between CPU and GPU</li>
+<li>Kernel launch overhead on the GPU</li>
+</ul>
+<p>Understanding these patterns is crucial for optimizing distributed training performance. For example, the trace will clearly show if gradient synchronization is properly overlapped with backward computation, as we'll discuss later.</p>
+<p>Now let’s get a larger workstation with a couple of GPUs and start investigating our first scaling technique, called <strong><em>data parallelism</em></strong> - which, as we'll see, is just a parallel version of gradient accumulation.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/lzx1413/ultra-scale-book" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
