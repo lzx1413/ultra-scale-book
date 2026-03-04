@@ -8,7 +8,9 @@ With tensor parallelism + sequence parallelism, we can reduce the memory require
 
 Moreover, even if we use full recomputation of the activations (which incurs a heavy compute overhead of ~30%), we still need to hold in memory some activations at the layer boundaries, which scale linearly with sequence length. Let's take a look and see how context parallelism (CP) can help us:
 
-> **[📊 Interactive Visualization: Cp 8Bmemoryusage](fragments/cp_8Bmemoryusage.html)**
+<iframe src="fragments/cp_8Bmemoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+*[Open full interactive visualization: Cp 8Bmemoryusage](fragments/cp_8Bmemoryusage.html)*
 
 The core idea of context parallelism is similar to sequence parallelism (i.e., splitting along the sequence length), but this approach is applied to the modules where we already apply tensor parallelism. We will thus split these modules along two dimensions, thereby also reducing the effect of sequence length. You should find this approach quite intuitive after all we’ve already covered, but there's a trick to it, so stay awake!
 
