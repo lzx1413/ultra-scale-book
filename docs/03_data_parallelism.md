@@ -8,13 +8,11 @@ To add a podcast feeling to your reading experience, feel free to listen to the 
 
 The idea behind data parallelism (DP) is to replicate the model on several GPUs (we call the replicas “model instances”) and run forward and backward passes on different micro-batches of data in parallel on each GPU - hence the name *data parallelism*. You've probably already seen data parallelism in simple training examples, but we'll dive quite a bit deeper in this section, so stay tuned even if you know the general approach.
 
-![image.png](assets/images/dp_diagram.png)
+> If you're not familiar with distributed communication patterns like broadcast, gather, and all-reduce, we've put together a small crash course in ["A0: Parallel Programming Crash Course"](#a0%3A_parallel_programming_crash_course).
 
 Using a different micro-batch for each GPU means we’ll have different gradients on each GPU, so to keep the model instances in sync across the different GPUs, we'll average the gradients from the model instances using an operation called “all-reduce.” This operation takes place during the backward pass, before the optimizer step.
 
 This involves our first “distributed communication” primitive, ***all-reduce***, which handles the synchronization and communication between GPU instances and nodes.
-
-![image.png](assets/images/dp_overlap1.svg)
 
 A naive DP implementation would just wait for the backward pass to finish so that we have all the gradients, then trigger an all-reduce over all the DP ranks to sync the gradients. But such sequential steps of computation followed by communication are **A BIG NO-NO** because we don’t want our GPUs to stay idle while communication is happening, like in the above image.
 
@@ -28,16 +26,20 @@ The main drawback of the naive DP approach we’ve just described is that after 
 
 As shown in the figure above, the gradients (pink boxes) for a layer can be gathered and summed even before the gradients from earlier layers (the pink boxes to their left) have been computed. For example, as soon as the backward pass of the last layer is complete (the last box on the right), those gradients can already be gathered and summed while the backward computations continue for earlier layers, moving toward the left.
 
-![image.png](assets/images/dp_overlap2.svg)
-
 This can be achieved in PyTorch by attaching an *all-reduce hook function* to each parameter. An all-reduce operation is then triggered as soon as the gradient for that parameter is ready, while the gradients for other parameters are still being computed. This approach overlaps most of the all-reduce operations with gradient calculations, thereby improving efficiency. Here's a simple function to attach a hook:
 
+```python
+def register_backward_hook(self, hook):
+                """
+                Registers a backward hook for all parameters of the model that 
+                require gradients.
+                """
+                for p in self.module.parameters():
+                    if p.requires_grad is True:
+                        p.register_post_accumulate_grad_hook(hook)
+```
+
 Overlapping computation and communication reduces the time spent waiting for gradient synchronization across the entire model. Gradient synchronization can occur (at least partially) in parallel with the backward pass within the same training step, significantly speeding up data parallelism. Here's a full implementation of naive DP with synchronization overlap:
-
-<details>
-<summary>👉 Naive DP implementation with overlap in Picotron (click to expand)</summary>
-
-</details>
 
 This is our first example of the concept of overlapping computation and communication, an essential technique for maximizing scaling efficiency that we will discuss several times in this book. But we can improve the efficiency even further!
 
@@ -45,16 +47,9 @@ This is our first example of the concept of overlapping computation and communic
 
 GPU operations are usually more efficient when performed on large tensors, rather than having many operations running on smaller tensors. This is also true for communication operations. Thus, we can advantageously group gradients into “buckets” and launch a single all-reduce for all the gradients within the same bucket instead of performing independent all-reduce operations for each gradient. It will generally look like the following:
 
-![dp_overlap3.svg](assets/images/dp_overlap3.svg)
-
 Think of it like packing items into boxes before shipping them. It's more efficient to send a few big boxes than many small ones. By performing a single all-reduce operation for each bucket, we can significantly reduce the communication overhead and speed up the communication operation.
 
 Here's a code implementation with bucketing:
-
-<details>
-<summary>👉 Bucket DP implementation in Picotron (click to expand)</summary>
-
-</details>
 
 #### Third optimization: Interplay with gradient accumulation
 
@@ -82,6 +77,13 @@ Given a targeted global batch size, we can thus trade gradient accumulation step
 
 In practice, people tend to maximize the data-parallel size ($dp$) over gradient accumulation ($grad\_acc$) as much as possible since data parallelism is inherently parallel, unlike the sequential nature of gradient accumulation. Gradient accumulation is then added on top of data parallelism to achieve the target global batch size, when scaling data parallelism alone is not sufficient before you run out of GPUs.
 
+<iframe src="/ultra-scale-book/fragments/dp_scaling.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+*[Open interactive visualization](/ultra-scale-book/fragments/dp_scaling.html)*
+
+
+> A good resource for further reading on data parallelism is [https://siboehm.com/articles/22/data-parallel-training](https://siboehm.com/articles/22/data-parallel-training).
+
 Being able to distribute the training over different samples gives us a first dimension of parallelization, thus making this 1D parallelism (we’ll progressively cover four more dimensions).
 
 ### Our journey up to now
@@ -92,6 +94,10 @@ Let’s quickly summarize how to set up our first 1D parallel training with a dr
 2. We then select a sequence length for training, again by either consulting the literature or running experiments. Generally, 2-8k tokens works reliably well for the evaluation benchmarks we have today (we won’t dive into training recipes here, but teams usually increase the sequence length at the end of the training, adding some longer context data samples into the mix to reach the longer context sizes of today).
 3. We now know the batch size ($gbs$). We can find the maximum local batch size ($mbs$) on a single GPU by increasing the local batch size until we run out of memory.
 4. Finally, we determine the number of available GPUs for our target $dp$. The ratio of $gbs$ to $dp$ gives us the remaining number of gradient accumulation steps needed for the desired $gbs$.
+
+> For instance, DeepSeek and Llama models are trained with a 4k token sequence length during the main pretraining phase.
+
+The reason 2-8k tokens works well for pretraining is that documents that are longer are very rare on the web. See [Harm de Vries’s blog post](https://www.harmdevries.com/post/context-length/) for a detailed analysis.
 
 If the gradient accumulation ratio is lower than 1 - i.e., we have too many GPUs/are GPU-rich 🤑 (!) - we can either choose not to use all our GPUs, explore a larger $gbs$, or test if a lower $mbs$ will speed up training. In the latter case we’ll end up prioritizing throughput over individual GPU compute efficiency, using a smaller $mbs$ than possible in order to speed up training.
 
@@ -105,19 +111,13 @@ While data parallelism nicely overlaps the all-reduce gradient synchronization w
 
 We can see this happening in practice with some benchmarks:
 
-<iframe src="/ultra-scale-book/fragments/dp_scaling.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Dp Scaling](/ultra-scale-book/fragments/dp_scaling.html)*
-
 As shown here, above some limit, our throughput starts to drop quite significantly while the memory usage per GPU stays constant and is not affected by adding more DP ranks.
 
 Data parallelism was our first (simple) strategy to scale training across more GPUs. This technique works like gradient accumulation but parallelizes the forward and backward passes on micro-batches, thus increasing throughput.
 
 The keen reader has already probably noted, however, that this assumes that we can fit at least one input sample forward pass ($mbs$=1) into GPU memory. This is not always the case! As we can see, larger models often don’t fit into a single GPU, even with activation recomputation activated:
 
-<iframe src="/ultra-scale-book/fragments/dp_ourjourney_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Dp Ourjourney Memoryusage](/ultra-scale-book/fragments/dp_ourjourney_memoryusage.html)*
+> Tip: You can quickly eyeball the minimum memory required for your model’s parameters by multiplying by 2 - e.g., 70B → 140 GB (= 133 GiB).
 
 We've also seen that data parallelism starts to have some limiting communication overhead above a certain level of scaling. Do we have other options for these larger models or large batch sizes? We do have some solutions, thankfully - they involve either moving some tensors to the CPU or splitting the weights/gradients/optimizer states tensors across GPU devices.
 
@@ -131,11 +131,15 @@ In this section we will introduce DeepSpeed ZeRO, a memory optimization technolo
 
 While data parallelism is an efficient way to scale training, the naive replication of optimizer states, gradients, and parameters across each DP rank introduces significant memory redundancy. ZeRO eliminates this by partitioning the optimizer states, gradients, and parameters across the data parallel dimension, while still allowing computation with the full set of parameters. This sometimes requires more communications between DP ranks, which may or may not be fully overlapped, as we’ll see next!
 
+> We’ll focus on ZeRO-1 to ZeRO-3 in this book, as this should give a broad view of how this technology helps reduce the memory usage while showing the trade-offs to take into account. You can find details on more ZeRO flavors in the [DeepSpeed docs](https://www.deepspeed.ai/tutorials/zero/).
+
 This approach is organized into three possible optimization stages:
 
 - ZeRO-1: optimizer state partitioning
 - ZeRO-2: optimizer state + gradient partitioning
 - ZeRO-3: optimizer state + gradient + parameter partitioning
+
+> When we say "partitioning" here, it means along the DP axis, as ZeRO is a data-parallel method. We’ll see later that we can partition along other axes as well.
 
 You might have noticed that activations is missing from the list of things we can shard. Since each DP replica of the model receives a different micro-batch, the activations on each DP rank also differ, so they are not duplicated and thus can’t be sharded!
 
@@ -143,7 +147,7 @@ Let’s have a closer look how much we can save with the partitioning of each Ze
 
 #### Memory usage revisited
 
-[Earlier](#memory_usage_in_transformers), we discussed the memory usage of optimizer states, gradients, and parameters during standard training. Let's call our model's parameter count $\Psi$ (previously this was $N$, but here we use the original ZeRO paper's[^12] notation). In mixed precision training (discussed further [later in the book](#mixed_precision_training)) with the Adam optimizer, the memory usage for each item we need to store is:
+[Earlier](#memory_usage_in_transformers), we discussed the memory usage of optimizer states, gradients, and parameters during standard training. Let's call our model's parameter count $\Psi$ (previously this was $N$, but here we use the original ZeRO paper's[^ref] notation). In mixed precision training (discussed further [later in the book](#mixed_precision_training)) with the Adam optimizer, the memory usage for each item we need to store is:
 
 - Model’s parameters (half precision; i.e., BF16/FP16): $2\Psi$
 - Model’s gradients (half precision; i.e., BF16/FP16): $2\Psi$
@@ -154,11 +158,9 @@ If we don't accumulate gradients in FP32, this gives us a total memory consumpti
 
 The idea of ZeRO is to shard these objects across the DP ranks, with each node only storing a slice of the items. These slices are then reconstructed when and if needed, thereby dividing memory usage by the data parallel degree $N_d$:
 
-![zero_memory.svg](assets/images/zero_memory.svg)
-
 Here, $\Psi$ denotes the number of parameters, $k$ denotes the memory multiplier of optimizer states ($k=12$ for Adam, as we've just seen), and $N_d$ denotes DP degree.
 
-$$\frac{4\Psi}{N_d}$$
+> If you're using FP32 gradient accumulation with ZeRO-2 or ZeRO-3, you would need to add an additional $\frac{4\Psi}{N_d}$ to the gradient term.
 
 Let’s explain this by exploring how each ZeRO stage works. We’ll start with ZeRO-1.
 
@@ -178,13 +180,11 @@ This explains the memory formula of $2\Psi + 2\Psi + \frac{k\Psi}{N_d}$ that we 
 4. Each replica performs an optimizer step on its local optimizer states (only $\frac{1}{N_d}$ of the optimizer states) to get  $\frac{1}{N_d}$ updated FP32 parameters, which can then be converted to $\frac{1}{N_d}$ of the full set of BF16 parameters.
 5. Perform an all-gather on the BF16 parameters to send the missing slices back to each replica. This is a new operation in ZeRO and is not used in vanilla DP.
 
+> Note: Reduce-scatter is two times faster than all-reduce! *Yay, a third communication primitive!*
+
 You may be wondering what this "reduce-scatter" operation is and what this all looks like, so let's try to make it more graphical with the figure below. We'll go over all the steps of a forward/backward pass cycle:
 
-![dp_zero1.gif](assets/images/dp_zero1.gif)
-
 In terms of practical communications, compared to vanilla DP, ZeRO-1 changes our all-reduce gradient communication to a reduce-scatter operation and adds an all-gather operation over all parameters after the optimizer step. Here's how it looks:
-
-![dp_zero1_overlap.svg](assets/images/dp_zero1_overlap.svg)
 
 If you've been following along, you'll recall from our discussion of vanilla DP that we can overlap the all-reduce gradient communication with the backward pass computation. In ZeRO-1, we can also investigate how to efficiently overlap the newly added all-gather of BF16 parameters. There are two main strategies for this:
 
@@ -201,15 +201,11 @@ In ZeRO-1, the optimizer states have been partitioned, which means that each rep
 
 Since on each replica we only need to have the gradient shard corresponding to its optimizer state shard, it makes sense to shard gradients as well, similarly to the optimizer states. Then, during the backward pass, instead of performing an all-reduce over the gradients, we only perform a reduce-scatter operation! Here, we only store the $\frac{1}{N_d}$ gradients that are needed in memory, thus saving more memory compared to ZeRO-1.
 
-$$\frac{1}{N_d}$$
-
-$$\frac{1}{N_d}$$
-
-![dp_zero2.gif](assets/images/dp_zero2.gif)
+> In the case of FP32 gradient accumulation, we only need to keep $\frac{1}{N_d}$ FP32 grads used to accumulate the BF16 grads coming from the reduce-scatter. And in the optimizer step, these $\frac{1}{N_d}$ FP32 grads are used to update the local shard of the optimizer states.
 
 It's easy to see now that sharding the gradients leads to $2\Psi + \frac{2\Psi+k\Psi}{N_d}$, and as $N_d$ is increased, we can use up to 8x less memory than the baseline. In terms of communication, the same process applies as for ZeRO-1, with the only difference being that we communicate and release memory on the fly: they both require a reduce-scatter for the gradients and an all-gather over all parameters. ZeRO-2 is thus also equivalent to vanilla DP training with regard to communication.
 
-![dp_zero2_overlap.svg](assets/images/dp_zero2_overlap.svg)
+> Note: You might notice that there is no real overhead to using ZeRO-2 over ZeRO-1 besides implementation complexity, and indeed ZeRO-2 is usually the better option.
 
 Now that we've sharded gradients as well, are we done, or can we keep making improvements? Here comes ZeRO-3!
 
@@ -223,36 +219,24 @@ PyTorch's native implementation of this stage is called FSDP (Fully Sharded Data
 
 So how do we do a forward or backward pass in practice if the parameters of the model are distributed? Quite simply, we gather them on demand when we need them. In the forward pass, this looks as follows:
 
-![dp_zero3_fwd.svg](assets/images/dp_zero3_fwd.svg)
-
 As we perform the forward pass and sequentially go through the layers, we retrieve the necessary parameters on demand and immediately flush them from memory when we don't need them anymore. The backward pass works the same way, just inverted in flow. Here, we produce the gradient shards:
 
-![dp_zero3_bwd.svg](assets/images/dp_zero3_bwd.svg)
-
 The other issue is that we need to do these all-gathers continuously throughout the forward and backward pass in a training step, which amounts to $2\cdot \text{num\_layers} -1$ additional all-gathers in a training step compared to ZeRO-2. Each comes with a small *base latency* overhead, as we can see in the following figure:
-
-![dp_zero3_overlap.svg](assets/images/dp_zero3_overlap.svg)
 
 During the forward pass we do all-gather operations for the parameters when we need them, so there's a $\Psi$ communication tax. Since we discard the parameters immediately after we use them in the forward pass, we need one more all-gather during the backward pass as well, incurring another $\Psi$ communication tax. Finally, we need the same reduce-scatter operation as in ZeRO-2 for the gradients, which also costs $\Psi$ in communication. So, we arrive at a total communication cost of $3\Psi$, compared to $2\Psi$ for ZeRO-2.
 
 This may sound like a lot of communication overhead, but it's actually not a big deal, as we can overlap the communication of the parameters for the next layer with the forward pass of the current layer in what is called ***prefetching***. With prefetching, we all-gather the weights for *Layer n+1* while we do the forward pass for *Layer n*, and similarly, we all-gather the weights for *Layer n-1* while doing the backward pass for *Layer n*. Of course, this overlap only works as long as we don’t scale DP too much (as a rule of thumb, DP shouldn’t exceed 512).
 
+> Note: We use "DP" to refer to both the data parallelism technique and the number of GPUs used for data parallelism *(DP = DP size = DP degree)*.
+
 In terms of memory, we can see that our equation has now reached its final form of $\frac{2\Psi +2\Psi+k\Psi}{N_d}$, which means we can theoretically drive memory usage down indefinitely if we can increase the DP size, at least for the model-related parameters. Notice that it doesn’t help with the intermediate activations, though - for that, we can use activation checkpointing and gradient accumulation, as we saw earlier.
 
 Let’s summarize our journey into DP and ZeRO so far. We've seen that we can increase the throughput of training significantly with DP, simply scaling training by adding more model replicas. With ZeRO, we can train even models that would ordinarily not fit into a single GPU by sharding the parameters, gradients, and optimizer states across DP replicas, while incurring a small communication cost.
 
+> If you want to read more about FSDP1, FSDP2, and some of the implementation complexities around them, check out [this nice blog](https://christianjmills.com/posts/mastering-llms-course-notes/conference-talk-012/).
+
 However, there are some limits here: DP only works if a layer of the model fits in a single GPU, and ZeRO can only partition the parameters, gradients, and optimizer states, not the activation memory! Recall from [the activation memory discussion](#memory_usage_in_transformers) that this part of the memory scales with sequence length and batch size. We could just limit those, but in practice we don’t want to be limited by hardware to train with only a short sequence length.
-
-<iframe src="/ultra-scale-book/fragments/zero3_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Zero3 Memoryusage](/ultra-scale-book/fragments/zero3_memoryusage.html)*
 
 To overcome this issue, it's time to examine a new, orthogonal axis of parallelism - ***tensor parallelism (TP)***. Unlike ZeRO-3, which relies on heavy parameter communication, TP proposes to shard parameters, gradients, optimizer states, AND activations across devices without requiring any communication of model parameters between GPUs.
 
 What? How is this even possible?! Let's explore this seemingly magical approach together. 🙂
-
-
----
-
-## References
-

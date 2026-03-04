@@ -1,0 +1,1226 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The ultimate guide to training LLM on large GPU Clusters">
+      
+      
+      
+        <link rel="canonical" href="https://lzx1413.github.io/ultra-scale-book/03_data_parallelism/">
+      
+      
+        <link rel="prev" href="../02_first_steps_training_on_one_gpu/">
+      
+      
+        <link rel="next" href="../04_tensor_parallelism/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>3. Data Parallelism - The Ultra-Scale Playbook</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-parallelism" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-header__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            The Ultra-Scale Playbook
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              3. Data Parallelism
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="The Ultra-Scale Playbook" class="md-nav__button md-logo" aria-label="The Ultra-Scale Playbook" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    The Ultra-Scale Playbook
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lzx1413/ultra-scale-book" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lzx1413/ultra-scale-book
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_high_level_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. High-Level Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_first_steps_training_on_one_gpu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. First Steps: Training on One GPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Data Parallelism
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Data Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-parallelism_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Parallelism
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Parallelism">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-optimization-overlap-gradient-synchronization-with-backward-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First optimization: Overlap gradient synchronization with backward pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#second-optimization-bucketing-gradients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Second optimization: Bucketing gradients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#third-optimization-interplay-with-gradient-accumulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Third optimization: Interplay with gradient accumulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revisiting-global-batch-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revisiting global batch size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#our-journey-up-to-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Our journey up to now
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-redundancy-optimizer-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero Redundancy Optimizer (ZeRO)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Zero Redundancy Optimizer (ZeRO)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-usage-revisited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory usage revisited
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-1-partitioning-optimizer-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-1: Partitioning optimizer states
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-2-adding-gradient-partitioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-2: Adding gradient partitioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-3-adding-parameter-partitioning-fsdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-3: Adding parameter partitioning (FSDP)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_tensor_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Tensor Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_context_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Context Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06_pipeline_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Pipeline Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_expert_parallelism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Expert Parallelism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_5d_parallelism_in_a_nutshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. 5D Parallelism in a Nutshell
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09_finding_best_training_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Finding the Best Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10_diving_into_gpus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Diving into the GPUs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11_conclusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Conclusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12_references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. References
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13_appendix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Appendix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-parallelism_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Parallelism
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Parallelism">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-optimization-overlap-gradient-synchronization-with-backward-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First optimization: Overlap gradient synchronization with backward pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#second-optimization-bucketing-gradients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Second optimization: Bucketing gradients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#third-optimization-interplay-with-gradient-accumulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Third optimization: Interplay with gradient accumulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revisiting-global-batch-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revisiting global batch size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#our-journey-up-to-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Our journey up to now
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-redundancy-optimizer-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero Redundancy Optimizer (ZeRO)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Zero Redundancy Optimizer (ZeRO)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-usage-revisited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory usage revisited
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-1-partitioning-optimizer-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-1: Partitioning optimizer states
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-2-adding-gradient-partitioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-2: Adding gradient partitioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-3-adding-parameter-partitioning-fsdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZeRO-3: Adding parameter partitioning (FSDP)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="data-parallelism">Data Parallelism<a class="headerlink" href="#data-parallelism" title="Permanent link">&para;</a></h1>
+<p><em>From <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook">The Ultra-Scale Playbook</a></em></p>
+<h2 id="data-parallelism_1">Data Parallelism<a class="headerlink" href="#data-parallelism_1" title="Permanent link">&para;</a></h2>
+<p>To add a podcast feeling to your reading experience, feel free to listen to the NotebookLM hosts discussing the following sections of this book as you're reading along.</p>
+<p>The idea behind data parallelism (DP) is to replicate the model on several GPUs (we call the replicas “model instances”) and run forward and backward passes on different micro-batches of data in parallel on each GPU - hence the name <em>data parallelism</em>. You've probably already seen data parallelism in simple training examples, but we'll dive quite a bit deeper in this section, so stay tuned even if you know the general approach.</p>
+<p><img alt="image.png" src="../assets/images/dp_diagram.png" /></p>
+<p>Using a different micro-batch for each GPU means we’ll have different gradients on each GPU, so to keep the model instances in sync across the different GPUs, we'll average the gradients from the model instances using an operation called “all-reduce.” This operation takes place during the backward pass, before the optimizer step.</p>
+<p>This involves our first “distributed communication” primitive, <strong><em>all-reduce</em></strong>, which handles the synchronization and communication between GPU instances and nodes.</p>
+<p><img alt="image.png" src="../assets/images/dp_overlap1.svg" /></p>
+<p>A naive DP implementation would just wait for the backward pass to finish so that we have all the gradients, then trigger an all-reduce over all the DP ranks to sync the gradients. But such sequential steps of computation followed by communication are <strong>A BIG NO-NO</strong> because we don’t want our GPUs to stay idle while communication is happening, like in the above image.</p>
+<p>Instead, we should try to overlap communication and computation whenever possible so that they happen at the same time.</p>
+<p>Let’s take a look at three optimizations that allow us to do much better than our naive first implementation.</p>
+<h4 id="first-optimization-overlap-gradient-synchronization-with-backward-pass">First optimization: Overlap gradient synchronization with backward pass<a class="headerlink" href="#first-optimization-overlap-gradient-synchronization-with-backward-pass" title="Permanent link">&para;</a></h4>
+<p>The main drawback of the naive DP approach we’ve just described is that after the backward pass (<em>computation</em>), we have to wait for gradient synchronization (<em>communication</em>) before updating the parameters. Could we overlap this communication with our computation? The answer is yes!</p>
+<p>As shown in the figure above, the gradients (pink boxes) for a layer can be gathered and summed even before the gradients from earlier layers (the pink boxes to their left) have been computed. For example, as soon as the backward pass of the last layer is complete (the last box on the right), those gradients can already be gathered and summed while the backward computations continue for earlier layers, moving toward the left.</p>
+<p><img alt="image.png" src="../assets/images/dp_overlap2.svg" /></p>
+<p>This can be achieved in PyTorch by attaching an <em>all-reduce hook function</em> to each parameter. An all-reduce operation is then triggered as soon as the gradient for that parameter is ready, while the gradients for other parameters are still being computed. This approach overlaps most of the all-reduce operations with gradient calculations, thereby improving efficiency. Here's a simple function to attach a hook:</p>
+<p>Overlapping computation and communication reduces the time spent waiting for gradient synchronization across the entire model. Gradient synchronization can occur (at least partially) in parallel with the backward pass within the same training step, significantly speeding up data parallelism. Here's a full implementation of naive DP with synchronization overlap:</p>
+<details>
+<summary>👉 Naive DP implementation with overlap in Picotron (click to expand)</summary>
+
+</details>
+
+<p>This is our first example of the concept of overlapping computation and communication, an essential technique for maximizing scaling efficiency that we will discuss several times in this book. But we can improve the efficiency even further!</p>
+<h4 id="second-optimization-bucketing-gradients">Second optimization: Bucketing gradients<a class="headerlink" href="#second-optimization-bucketing-gradients" title="Permanent link">&para;</a></h4>
+<p>GPU operations are usually more efficient when performed on large tensors, rather than having many operations running on smaller tensors. This is also true for communication operations. Thus, we can advantageously group gradients into “buckets” and launch a single all-reduce for all the gradients within the same bucket instead of performing independent all-reduce operations for each gradient. It will generally look like the following:</p>
+<p><img alt="dp_overlap3.svg" src="../assets/images/dp_overlap3.svg" /></p>
+<p>Think of it like packing items into boxes before shipping them. It's more efficient to send a few big boxes than many small ones. By performing a single all-reduce operation for each bucket, we can significantly reduce the communication overhead and speed up the communication operation.</p>
+<p>Here's a code implementation with bucketing:</p>
+<details>
+<summary>👉 Bucket DP implementation in Picotron (click to expand)</summary>
+
+</details>
+
+<h4 id="third-optimization-interplay-with-gradient-accumulation">Third optimization: Interplay with gradient accumulation<a class="headerlink" href="#third-optimization-interplay-with-gradient-accumulation" title="Permanent link">&para;</a></h4>
+<p>Finally, as we’ve seen, gradient accumulation works by performing multiple forward and backward passes before updating the parameters with <code>optimizer.step()</code>. When combining gradient accumulation with data parallelism, we should be careful when we want to synchronize gradients.</p>
+<p>In a naive version, an all-reduce operation is automatically triggered after each backward pass during the accumulation. This is suboptimal, as a single reduce after the final step would have the same effect while reducing overhead.</p>
+<p>In PyTorch, this is typically solved by adding a <a href="https://github.com/pytorch/pytorch/blob/5ea67778619c31b13644914deef709199052ee55/torch/nn/parallel/distributed.py#L1408-L1435"><code>model.no_sync()</code></a> decorator, which disables gradient synchronization, on the backward passes that don’t need reduction.</p>
+<p>📝 Note</p>
+<p>When performing communication operations, tensors must be contiguous in memory to avoid redundant memory copies. To perform this optimally, we often preallocate continuous buffers of the size of the activations or model parameters specifically for communication. While this speeds up communication, it also contributes in part to the peak memory usage during training.</p>
+<p>Now, let's have a look what this means for the global batch size.</p>
+<h3 id="revisiting-global-batch-size">Revisiting global batch size<a class="headerlink" href="#revisiting-global-batch-size" title="Permanent link">&para;</a></h3>
+<p>We can update our batch size equation with our newly added data parallelism and gradient accumulation parameters:</p>
+<div class="arithmatex">\[bs = gbs = mbs \times grad\_acc  \times dp\]</div>
+<p>Here, <span class="arithmatex">\(grad\_acc\)</span> is the number of gradient accumulation steps and <span class="arithmatex">\(dp\)</span> is the number of parallel instances used for data parallelism.</p>
+<p>Given a targeted global batch size, we can thus trade gradient accumulation steps for data-parallel processes to speed up training.</p>
+<p>In practice, people tend to maximize the data-parallel size (<span class="arithmatex">\(dp\)</span>) over gradient accumulation (<span class="arithmatex">\(grad\_acc\)</span>) as much as possible since data parallelism is inherently parallel, unlike the sequential nature of gradient accumulation. Gradient accumulation is then added on top of data parallelism to achieve the target global batch size, when scaling data parallelism alone is not sufficient before you run out of GPUs.</p>
+<p>Being able to distribute the training over different samples gives us a first dimension of parallelization, thus making this 1D parallelism (we’ll progressively cover four more dimensions).</p>
+<h3 id="our-journey-up-to-now">Our journey up to now<a class="headerlink" href="#our-journey-up-to-now" title="Permanent link">&para;</a></h3>
+<p>Let’s quickly summarize how to set up our first 1D parallel training with a draft recipe for an optimal data-parallel setup:</p>
+<ol>
+<li>We first determine the best (global) batch size in tokens, either by consulting the literature or by running experiments measuring model convergence.</li>
+<li>We then select a sequence length for training, again by either consulting the literature or running experiments. Generally, 2-8k tokens works reliably well for the evaluation benchmarks we have today (we won’t dive into training recipes here, but teams usually increase the sequence length at the end of the training, adding some longer context data samples into the mix to reach the longer context sizes of today).</li>
+<li>We now know the batch size (<span class="arithmatex">\(gbs\)</span>). We can find the maximum local batch size (<span class="arithmatex">\(mbs\)</span>) on a single GPU by increasing the local batch size until we run out of memory.</li>
+<li>Finally, we determine the number of available GPUs for our target <span class="arithmatex">\(dp\)</span>. The ratio of <span class="arithmatex">\(gbs\)</span> to <span class="arithmatex">\(dp\)</span> gives us the remaining number of gradient accumulation steps needed for the desired <span class="arithmatex">\(gbs\)</span>.</li>
+</ol>
+<p>If the gradient accumulation ratio is lower than 1 - i.e., we have too many GPUs/are GPU-rich 🤑 (!) - we can either choose not to use all our GPUs, explore a larger <span class="arithmatex">\(gbs\)</span>, or test if a lower <span class="arithmatex">\(mbs\)</span> will speed up training. In the latter case we’ll end up prioritizing throughput over individual GPU compute efficiency, using a smaller <span class="arithmatex">\(mbs\)</span> than possible in order to speed up training.</p>
+<p>It's time to look at a concrete example. Let's say we want to train a recent model with a <span class="arithmatex">\(gbs\)</span> of 4M tokens and a sequence length of 4k. Our batch size will thus be 1,024 samples (we pick the closest power of 2). Let's assume we observe that a single GPU can only fit <span class="arithmatex">\(mbs\)</span>=2 in memory, and we have 128 GPUs available for training. This means with 4 gradient accumulation steps, we'll achieve our goal of 1,024 samples or 4M tokens per training step. Now, what if we suddenly have 512 GPUs available? We can achieve the same <span class="arithmatex">\(gbs\)</span> by keeping <span class="arithmatex">\(mbs\)</span>=2 and setting the number of gradient accumulation steps to 1, which will result in faster training!</p>
+<p>📝 Note</p>
+<p>Bear in mind that at the 512+ GPU scale, depending on the network used, the communication operations will start to be bound by <em>ring latency</em> (the time required for a signal to propagate once around the ring), which means we can no longer fully overlap the DP communications. This will decrease our compute efficiency and hit our throughput. In this case, we should start exploring other dimensions to parallelize on.</p>
+<p>While data parallelism nicely overlaps the all-reduce gradient synchronization with backward computation to save time, this benefit starts to break down at large scales. Why? As we add more and more GPUs (hundreds or thousands), the overhead of coordinating between them grows significantly, and the network requirements start to become too large for the benefits. As a result, our setup will become less and less efficient with each additional GPU we add to the system.</p>
+<p>We can see this happening in practice with some benchmarks:</p>
+<iframe src="/ultra-scale-book/fragments/dp_scaling.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/dp_scaling.html">Open full interactive visualization: Dp Scaling</a></em></p>
+<p>As shown here, above some limit, our throughput starts to drop quite significantly while the memory usage per GPU stays constant and is not affected by adding more DP ranks.</p>
+<p>Data parallelism was our first (simple) strategy to scale training across more GPUs. This technique works like gradient accumulation but parallelizes the forward and backward passes on micro-batches, thus increasing throughput.</p>
+<p>The keen reader has already probably noted, however, that this assumes that we can fit at least one input sample forward pass (<span class="arithmatex">\(mbs\)</span>=1) into GPU memory. This is not always the case! As we can see, larger models often don’t fit into a single GPU, even with activation recomputation activated:</p>
+<iframe src="/ultra-scale-book/fragments/dp_ourjourney_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/dp_ourjourney_memoryusage.html">Open full interactive visualization: Dp Ourjourney Memoryusage</a></em></p>
+<p>We've also seen that data parallelism starts to have some limiting communication overhead above a certain level of scaling. Do we have other options for these larger models or large batch sizes? We do have some solutions, thankfully - they involve either moving some tensors to the CPU or splitting the weights/gradients/optimizer states tensors across GPU devices.</p>
+<p>There are two main approaches to splitting: parallelism (tensor, context, or pipeline parallelism) and sharding (DeepSpeed ZeRO or PyTorch FSDP). Both approaches are somewhat orthogonal and can actually be combined!</p>
+<p>The sharding paradigm is closely related to DP, so we’ll have a look at it first by investigating the ZeRO method.</p>
+<h3 id="zero-redundancy-optimizer-zero">Zero Redundancy Optimizer (ZeRO)<a class="headerlink" href="#zero-redundancy-optimizer-zero" title="Permanent link">&para;</a></h3>
+<p>In this section we will introduce DeepSpeed ZeRO, a memory optimization technology designed to reduce memory redundancy in LLM training.</p>
+<p>While data parallelism is an efficient way to scale training, the naive replication of optimizer states, gradients, and parameters across each DP rank introduces significant memory redundancy. ZeRO eliminates this by partitioning the optimizer states, gradients, and parameters across the data parallel dimension, while still allowing computation with the full set of parameters. This sometimes requires more communications between DP ranks, which may or may not be fully overlapped, as we’ll see next!</p>
+<p>This approach is organized into three possible optimization stages:</p>
+<ul>
+<li>ZeRO-1: optimizer state partitioning</li>
+<li>ZeRO-2: optimizer state + gradient partitioning</li>
+<li>ZeRO-3: optimizer state + gradient + parameter partitioning</li>
+</ul>
+<p>You might have noticed that activations is missing from the list of things we can shard. Since each DP replica of the model receives a different micro-batch, the activations on each DP rank also differ, so they are not duplicated and thus can’t be sharded!</p>
+<p>Let’s have a closer look how much we can save with the partitioning of each ZeRO stage.</p>
+<h4 id="memory-usage-revisited">Memory usage revisited<a class="headerlink" href="#memory-usage-revisited" title="Permanent link">&para;</a></h4>
+<p><a href="#memory_usage_in_transformers">Earlier</a>, we discussed the memory usage of optimizer states, gradients, and parameters during standard training. Let's call our model's parameter count <span class="arithmatex">\(\Psi\)</span> (previously this was <span class="arithmatex">\(N\)</span>, but here we use the original ZeRO paper's[] notation). In mixed precision training (discussed further <a href="#mixed_precision_training">later in the book</a>) with the Adam optimizer, the memory usage for each item we need to store is:</p>
+<ul>
+<li>Model’s parameters (half precision; i.e., BF16/FP16): <span class="arithmatex">\(2\Psi\)</span></li>
+<li>Model’s gradients (half precision; i.e., BF16/FP16): <span class="arithmatex">\(2\Psi\)</span></li>
+<li>Model’s parameters in FP32 and optimizer states: <span class="arithmatex">\(4\Psi + (4\Psi + 4\Psi)\)</span></li>
+<li>Model’s gradients in FP32: <span class="arithmatex">\(4\Psi\)</span> (optional, only included if we want to accumulate gradients in FP32)</li>
+</ul>
+<p>If we don't accumulate gradients in FP32, this gives us a total memory consumption of <span class="arithmatex">\(2\Psi + 2\Psi + 12\Psi\)</span>, and if we do it gives us <span class="arithmatex">\(2\Psi + 6\Psi + 12\Psi\)</span>. Let's focus for now on the case without FP32 gradient accumulation for simplicity.</p>
+<p>The idea of ZeRO is to shard these objects across the DP ranks, with each node only storing a slice of the items. These slices are then reconstructed when and if needed, thereby dividing memory usage by the data parallel degree <span class="arithmatex">\(N_d\)</span>:</p>
+<p><img alt="zero_memory.svg" src="../assets/images/zero_memory.svg" /></p>
+<p>Here, <span class="arithmatex">\(\Psi\)</span> denotes the number of parameters, <span class="arithmatex">\(k\)</span> denotes the memory multiplier of optimizer states (<span class="arithmatex">\(k=12\)</span> for Adam, as we've just seen), and <span class="arithmatex">\(N_d\)</span> denotes DP degree.</p>
+<div class="arithmatex">\[\frac{4\Psi}{N_d}\]</div>
+<p>Let’s explain this by exploring how each ZeRO stage works. We’ll start with ZeRO-1.</p>
+<h4 id="zero-1-partitioning-optimizer-states">ZeRO-1: Partitioning optimizer states<a class="headerlink" href="#zero-1-partitioning-optimizer-states" title="Permanent link">&para;</a></h4>
+<p>In vanilla DP, all ranks gather the same gradients after the backward pass and simultaneously perform identical optimizer steps. This seems like a lot of duplicated work. Can we avoid it and reduce memory usage at the same time?</p>
+<p>In ZeRO-1, the optimizer states are partitioned into <span class="arithmatex">\(N_d\)</span> equal parts, where <span class="arithmatex">\(N_d\)</span> is the DP degree. This means that the model replicas distributed on the DP ranks each only keep track of <span class="arithmatex">\(\frac{1}{N_d}\)</span> of the optimizer states, and during the optimization step, only <span class="arithmatex">\(\frac{1}{N_d}\)</span> of the FP32 weights are updated.</p>
+<p>However, during the forward pass, each replica needs all the parameters. We thus need to add an additional <strong><em>all-gather</em></strong> (the second type of collective communication primitive we've encountered!) after the optimizer step so that each model replica has the full set of updated weights.</p>
+<p>This explains the memory formula of <span class="arithmatex">\(2\Psi + 2\Psi + \frac{k\Psi}{N_d}\)</span> that we saw in the previous figure! Here’s a summary of the sequence of operations for a single training step:</p>
+<ol>
+<li>Perform a forward pass with the same full set of BF16 parameters on each replica, but different micro-batches across replicas.</li>
+<li>Perform a backward pass with the same full set of gradients on each replica, but different micro-batches across replicas.</li>
+<li>Perform a <strong><em>reduce-scatter</em></strong> on the gradients (another primitive - we'll explain this one shortly).</li>
+<li>Each replica performs an optimizer step on its local optimizer states (only <span class="arithmatex">\(\frac{1}{N_d}\)</span> of the optimizer states) to get  <span class="arithmatex">\(\frac{1}{N_d}\)</span> updated FP32 parameters, which can then be converted to <span class="arithmatex">\(\frac{1}{N_d}\)</span> of the full set of BF16 parameters.</li>
+<li>Perform an all-gather on the BF16 parameters to send the missing slices back to each replica. This is a new operation in ZeRO and is not used in vanilla DP.</li>
+</ol>
+<p>You may be wondering what this "reduce-scatter" operation is and what this all looks like, so let's try to make it more graphical with the figure below. We'll go over all the steps of a forward/backward pass cycle:</p>
+<p><img alt="dp_zero1.gif" src="../assets/images/dp_zero1.gif" /></p>
+<p>In terms of practical communications, compared to vanilla DP, ZeRO-1 changes our all-reduce gradient communication to a reduce-scatter operation and adds an all-gather operation over all parameters after the optimizer step. Here's how it looks:</p>
+<p><img alt="dp_zero1_overlap.svg" src="../assets/images/dp_zero1_overlap.svg" /></p>
+<p>If you've been following along, you'll recall from our discussion of vanilla DP that we can overlap the all-reduce gradient communication with the backward pass computation. In ZeRO-1, we can also investigate how to efficiently overlap the newly added all-gather of BF16 parameters. There are two main strategies for this:</p>
+<ul>
+<li><strong>During the optimizer step:</strong> We can initiate the all-gather immediately after the optimizer updates the first slice of the parameters. This allows the communication to potentially overlap with the updating of the other parameters.</li>
+<li><strong>During the forward pass:</strong> We can overlap the all-gather of each layer’s parameters with the forward pass.</li>
+</ul>
+<p>📝 Note</p>
+<p>Unfortunately, these techniques are not straightforward to implement and require sophisticated use of hooks/bucketing. In practice, we can just use PyTorch's native ZeRO-3/FSDP implementation and set the <code>FSDPUnit</code> to be the entire model (more details about this later).</p>
+<p>In ZeRO-1, the optimizer states have been partitioned, which means that each replica only updates <span class="arithmatex">\(\frac{1}{N_d}\)</span> of the states. The keen reader might have noticed that there is no real need to have all the gradients on all the DP ranks, as only a subset of these are needed for the optimization step. Meet ZeRO-2!</p>
+<h4 id="zero-2-adding-gradient-partitioning">ZeRO-2: Adding gradient partitioning<a class="headerlink" href="#zero-2-adding-gradient-partitioning" title="Permanent link">&para;</a></h4>
+<p>Since on each replica we only need to have the gradient shard corresponding to its optimizer state shard, it makes sense to shard gradients as well, similarly to the optimizer states. Then, during the backward pass, instead of performing an all-reduce over the gradients, we only perform a reduce-scatter operation! Here, we only store the <span class="arithmatex">\(\frac{1}{N_d}\)</span> gradients that are needed in memory, thus saving more memory compared to ZeRO-1.</p>
+<div class="arithmatex">\[\frac{1}{N_d}\]</div>
+<div class="arithmatex">\[\frac{1}{N_d}\]</div>
+<p><img alt="dp_zero2.gif" src="../assets/images/dp_zero2.gif" /></p>
+<p>It's easy to see now that sharding the gradients leads to <span class="arithmatex">\(2\Psi + \frac{2\Psi+k\Psi}{N_d}\)</span>, and as <span class="arithmatex">\(N_d\)</span> is increased, we can use up to 8x less memory than the baseline. In terms of communication, the same process applies as for ZeRO-1, with the only difference being that we communicate and release memory on the fly: they both require a reduce-scatter for the gradients and an all-gather over all parameters. ZeRO-2 is thus also equivalent to vanilla DP training with regard to communication.</p>
+<p><img alt="dp_zero2_overlap.svg" src="../assets/images/dp_zero2_overlap.svg" /></p>
+<p>Now that we've sharded gradients as well, are we done, or can we keep making improvements? Here comes ZeRO-3!</p>
+<h4 id="zero-3-adding-parameter-partitioning-fsdp">ZeRO-3: Adding parameter partitioning (FSDP)<a class="headerlink" href="#zero-3-adding-parameter-partitioning-fsdp" title="Permanent link">&para;</a></h4>
+<p>For stage 3, we extend the above approach of sharding optimizer states and gradients over DP replicas to sharding the model’s parameters.</p>
+<p>📝 Note</p>
+<p>PyTorch's native implementation of this stage is called FSDP (Fully Sharded Data Parallelism). We’ll just refer to it as ZeRO-3 in this book, but you can think of FSDP wherever you see it.</p>
+<p>So how do we do a forward or backward pass in practice if the parameters of the model are distributed? Quite simply, we gather them on demand when we need them. In the forward pass, this looks as follows:</p>
+<p><img alt="dp_zero3_fwd.svg" src="../assets/images/dp_zero3_fwd.svg" /></p>
+<p>As we perform the forward pass and sequentially go through the layers, we retrieve the necessary parameters on demand and immediately flush them from memory when we don't need them anymore. The backward pass works the same way, just inverted in flow. Here, we produce the gradient shards:</p>
+<p><img alt="dp_zero3_bwd.svg" src="../assets/images/dp_zero3_bwd.svg" /></p>
+<p>The other issue is that we need to do these all-gathers continuously throughout the forward and backward pass in a training step, which amounts to <span class="arithmatex">\(2\cdot \text{num\_layers} -1\)</span> additional all-gathers in a training step compared to ZeRO-2. Each comes with a small <em>base latency</em> overhead, as we can see in the following figure:</p>
+<p><img alt="dp_zero3_overlap.svg" src="../assets/images/dp_zero3_overlap.svg" /></p>
+<p>During the forward pass we do all-gather operations for the parameters when we need them, so there's a <span class="arithmatex">\(\Psi\)</span> communication tax. Since we discard the parameters immediately after we use them in the forward pass, we need one more all-gather during the backward pass as well, incurring another <span class="arithmatex">\(\Psi\)</span> communication tax. Finally, we need the same reduce-scatter operation as in ZeRO-2 for the gradients, which also costs <span class="arithmatex">\(\Psi\)</span> in communication. So, we arrive at a total communication cost of <span class="arithmatex">\(3\Psi\)</span>, compared to <span class="arithmatex">\(2\Psi\)</span> for ZeRO-2.</p>
+<p>This may sound like a lot of communication overhead, but it's actually not a big deal, as we can overlap the communication of the parameters for the next layer with the forward pass of the current layer in what is called <strong><em>prefetching</em></strong>. With prefetching, we all-gather the weights for <em>Layer n+1</em> while we do the forward pass for <em>Layer n</em>, and similarly, we all-gather the weights for <em>Layer n-1</em> while doing the backward pass for <em>Layer n</em>. Of course, this overlap only works as long as we don’t scale DP too much (as a rule of thumb, DP shouldn’t exceed 512).</p>
+<p>In terms of memory, we can see that our equation has now reached its final form of <span class="arithmatex">\(\frac{2\Psi +2\Psi+k\Psi}{N_d}\)</span>, which means we can theoretically drive memory usage down indefinitely if we can increase the DP size, at least for the model-related parameters. Notice that it doesn’t help with the intermediate activations, though - for that, we can use activation checkpointing and gradient accumulation, as we saw earlier.</p>
+<p>Let’s summarize our journey into DP and ZeRO so far. We've seen that we can increase the throughput of training significantly with DP, simply scaling training by adding more model replicas. With ZeRO, we can train even models that would ordinarily not fit into a single GPU by sharding the parameters, gradients, and optimizer states across DP replicas, while incurring a small communication cost.</p>
+<p>However, there are some limits here: DP only works if a layer of the model fits in a single GPU, and ZeRO can only partition the parameters, gradients, and optimizer states, not the activation memory! Recall from <a href="#memory_usage_in_transformers">the activation memory discussion</a> that this part of the memory scales with sequence length and batch size. We could just limit those, but in practice we don’t want to be limited by hardware to train with only a short sequence length.</p>
+<iframe src="/ultra-scale-book/fragments/zero3_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+
+<p><em><a href="/ultra-scale-book/fragments/zero3_memoryusage.html">Open full interactive visualization: Zero3 Memoryusage</a></em></p>
+<p>To overcome this issue, it's time to examine a new, orthogonal axis of parallelism - <strong><em>tensor parallelism (TP)</em></strong>. Unlike ZeRO-3, which relies on heavy parameter communication, TP proposes to shard parameters, gradients, optimizer states, AND activations across devices without requiring any communication of model parameters between GPUs.</p>
+<p>What? How is this even possible?! Let's explore this seemingly magical approach together. 🙂</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/lzx1413/ultra-scale-book" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

@@ -72,11 +72,11 @@ In the [Nanotron](https://github.com/huggingface/nanotron) repository, you'll fi
 
 We actually ran benchmarks ourselves on **several thousand distributed configurations**, covering every model size we've discussed here as well as a very large number of cluster configurations (namely, 1-64 nodes of 8xH100s) in order to produce the results we've covered up to now in this book.
 
+> We want to take this opportunity to apologize to our coworkers for blocking most of the science cluster, and in turn forgive any threats that may have been whispered.
+
 Now let's take a step back to gather and analyze the results of all our benchmarks and see if, beyond theory, we can actually discover using real-world data how various configurations fare against each other.
 
 All the following benchmarks were conducted with a sequence length of 4,096 and a global batch size of 1M tokens. We gathered all the top configurations for each model and cluster size and plotted them in the following heatmaps:
-
-![image.png](assets/images/what_we_learnt_heatmap.svg)
 
 Heatmap visualization showing the optimal training configurations across different model sizes and compute node counts (we have 8 GPUs per node). For each combination, the configuration details include data parallelism (DP), tensor parallelism (TP), pipeline parallelism (PP), gradient accumulation steps (GAS), micro-batch size (MBS), and ZeRO optimization stage. The color intensity indicates the model FLOPs utilization (MFU), with brighter colors representing higher efficiency.
 
@@ -111,5 +111,7 @@ Reproducing theoretical results in real life is challenging, especially given th
 This concludes our very deep dive into the distribution methods of 5D parallelism.
 
 Taking a step back, our discussion so far has often relied on a critical assumption: that computation and communication can be efficiently overlapped on GPUs without any impact on the computation throughput. The reality is more nuanced. When using common communication primitives like NCCL send/recv, we face hidden contention between computation and communication resources as communication kernels will usually make use of the same GPU streaming multiprocessors (discussed in the following section) that are used for computation. This leads to decreased throughput when communication is overlapped with computation. To truly optimize our distributed training, we need to dive deeper into the GPU architecture itself.
+
+> Additionally, the synchronization patterns when overlapping computation and communication may not always be optimal for our parallel strategies. You can find an example in [this blog post](https://discuss.pytorch.org/t/distributed-w-torchtitan-introducing-async-tensor-parallelism-in-pytorch/209487) by the PyTorch team.
 
 Time to turn the lights off and activate CUDA mode!

@@ -22,31 +22,15 @@ This means that we can compute the matrix product by either multiplying each col
 
 In practice, a small example of the operation looks like this:
 
-![TP diagram](assets/images/tp_diagram.svg)
-
 Let’s see how we can parallelize this operation! In tensor parallelism, tensors are split into $N$ shards along a particular dimension and distributed across $N$ GPUs. Matrices can be split on either columns or rows, leading to row or column parallelism. As we’ll see in the following discussion, row and column sharding require different communication primitives.
 
 Our first option is to use ***column-wise*** (also called *column-linear*) sharding: we'll copy the complete input matrices to each worker, requiring an operation called ***broadcast***, and split the weight matrix by columns. The inputs are then multiplied with the partial weight matrices, and finally the results are combined using an all-gather operation.
 
-![image.png](assets/images/tp_diagram2.png)
-
 Here's the code implementation of column-wise tensor parallelism:
-
-<details>
-<summary>👉 Column parallel TP implementation in Picotron (click to expand)</summary>
-
-</details>
 
 The second option is called ***row-wise*** (or *row-linear*) sharding. As the attentive reader might guess, row-linear means that we split the weight matrix into chunks of rows. However, this also requires us to split the inputs, so we need to use a ***scatter*** operation (our fourth distributed communication primitive!) rather than the broadcast operation used in column-linear sharding. The results on each worker are already in the right shape but need to be summed for the final result, so this scenario also requires an all-reduce operation:
 
-![image.png](assets/images/tp_diagram3.png)
-
 Here's the implementation for row-wise tensor parallelism:
-
-<details>
-<summary>👉 Row-parallel TP implementation in Picotron (click to expand)</summary>
-
-</details>
 
 Now that we have the basic building blocks of TP, let's have a look at how we can effectively combine them inside a transformer layer!
 
@@ -56,13 +40,9 @@ To come up with a strategy to follow, let’s move from a toy example to a real 
 
 The feedforward part can be parallelized by having a column-linear followed by a row-linear split, which amounts to a broadcast to copy the input and an all-reduce in the forward pass. Note that the broadcast isn’t needed in actual training, where we can make sure inputs are already synced across TP ranks. This setup is more efficient than starting with a row-linear followed by column-linear split, as we can skip the intermediate all-reduce between the split operations.
 
-![image.png](assets/images/tp_diagram4.png)
-
 Now that we've found an efficient schema for the feedforward part of the transformer, let's take a look at the multi-head attention block.
 
 We can generally follow a similar approach here, where the Query (Q), Key (K), and Value (V) matrices are split in a column-parallel fashion and the output projection can be considered a row-linear. With multi-head attention, the column-parallel approach has a very natural interpretation: each GPU computes the attention for an individual or a subset of attention heads. The same approach works as well for [***multi-query attention (MQA)***](https://arxiv.org/abs/1911.02150) or [***grouped query attention (GQA)***](https://arxiv.org/abs/2305.13245), where keys and values are shared between queries.
-
-![image.png](assets/images/tp_full_diagram.png)
 
 We're able to apply tensor parallelism so effectively to both the Attention and MLP blocks because they have dimensions that are naturally independent. The Attention block can be parallelized along the `num_attention_heads` dimension, as each attention head operates independently. Similarly, the MLP block can be parallelized along the `hidden_dim` dimension, as operations within the feedforward network are independent along this dimension.
 
@@ -70,27 +50,23 @@ It's worth noting, however, that the tensor parallelism degree should not exceed
 
 Note also that tensor parallelism is not a silver bullet for training. We’ve added several distributed communication primitives directly in the computation path of our model, which are therefore hard to fully hide/overlap with computation (like we did in ZeRO), so our final performance will be the result of a trade-off between the computation and memory gains and the added communication overhead. Let's illustrate this:
 
-![Forward pass in tensor parallelism](assets/images/tp_overlap.svg)
+> It's possible to partially hide this communication by performing block matrix multiplication coupled with async communication/computation.
 
 Looking at the timeline of operations in tensor-parallel MLP (the same applies for MHA), we can better understand the trade-offs involved. In the forward pass of each decoder layer, we hit a synchronization point with the all-reduce operation that cannot be overlapped with computation. This *exposed communication overhead* is necessary to combine partial results across tensor-parallel ranks before the final LayerNorm can be applied.
 
+> For example, Megatron-LM and Nanotron implement a partial overlapping of all-gather with Fully-Connected (FC1) computation, where a portion of the matrix multiplication result gets sent to the other GPU while the remaining part is still being computed.
+
 Tensor parallelism does help reduce activation memory for the matrix multiplications since the intermediate activations are sharded across GPUs. However, we still need to gather the full activations for operations like LayerNorm, which means we're not getting the full memory benefits we could. Additionally, TP introduces significant communication requirements that heavily depend on the network infrastructure. The inability to fully hide this particular all-reduce behind computation means it directly adds to the critical path of forward propagation, where the critical path refers to the sequence of operations that determine the minimum time required to complete the forward pass.
 
+> This is an active area of research, with recent work like Domino [^ref] exploring novel techniques to maximize this overlap.
+
 Let's take a better look at the trade-off as we scale the TP degree:
-
-<iframe src="/ultra-scale-book/fragments/tp_scaling.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Tp Scaling](/ultra-scale-book/fragments/tp_scaling.html)*
 
 While increasing TP leads to reduced per-GPU throughput (left), it enables processing of larger batch sizes (right), illustrating the trade-off between computational efficiency and memory availability in distributed training.
 
 In practice, as we see in the lefthand plot above, the communication overhead of tensor parallelism becomes particularly noticeable as we scale beyond 8 GPUs. While tensor parallelism within a single node can leverage fast NVLink interconnects, going across nodes requires slower network connections. We observe significant drops when moving from TP=8 to TP=16, and an even steeper decline from TP=16 to TP=32. At higher degrees of parallelism, the communication overhead becomes so high that it quickly dominates the computation time.
 
 This being said, tensor parallelism provides important benefits for memory usage by distributing model parameters, gradients, optimizer states, and activations (to some extent) across GPUs. Let's examine this effect on a 70B parameter model:
-
-<iframe src="/ultra-scale-book/fragments/tp_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Tp Memoryusage](/ultra-scale-book/fragments/tp_memoryusage.html)*
 
 Increasing tensor parallelism reduces the memory needed for model parameters, gradients, and optimizer states on each GPU to the point where we can start fitting a larger model onto a single node of 8 GPUs.
 
@@ -119,10 +95,6 @@ where $\mu = \text{mean}(x)$ and $\sigma^2 = \text{var}(x)$ are computed across 
 Consequently, even though these operations are computationally cheap, they still require significant activation memory. Sequence parallelism allows us to shard this memory burden across GPUs by splitting along the sequence dimension instead.
 
 The following diagram shows how we transition between tensor-parallel and sequence-parallel regions using different collective operations (labeled *f* and *g*). In practice, we’ll go from the left to the right:
-
-![ in forward: f = no-op ; f* = all-reduce ; g = all-gather ; g* = reduce-scatter
-            in backward: f = all-reduce ; f* = no-op ; g = reduce-scatter ; g* = all-gather
-           SP region needs full hidden_dim](assets/images/tp_sp_diagram.png)
 
 The key challenge is managing these transitions efficiently while keeping memory usage low and maintaining correctness.
 
@@ -168,8 +140,6 @@ So what is actually happening here? As a famous LLM would say, let’s take it s
 - *g** operation (reduce-scatter) reduces for previous row-linear correctness while scattering along the sequence dimension.
 - *W1** and *W2** are $(b,s/2,h)$.
 
-![image.png](assets/images/tp_sp_diagram_zoomed.png)
-
 A key advantage of sequence parallelism is that it reduces the maximum activation size we need to store. With tensor parallelism alone, we had to store activations of shape $(b,s,h)$ at various points. However, with sequence parallelism, the maximum activation size is reduced to $\frac{b \cdot s \cdot h}{tp}$ since we always either split along the sequence or the hidden dimension.
 
 It’s a bit difficult to keep track of all the parts that are sharded differently in TP and TP+SP - believe us, we find it hard to map as well, so we made this small table to summarize how the activations (a.k.a. `hidden_states`) shape changes across the hidden dimension $h$ and sequence dimension $s$ during a forward pass:
@@ -199,25 +169,15 @@ $s$: **reduce-scatter** to sharded |
 
 By using sequence parallelism, we can achieve even greater activation memory savings, allowing us to push our batch size and sequence length further than would be possible with tensor parallelism alone. Let's see what that means for our previous 70B model example:
 
-<iframe src="/ultra-scale-book/fragments/tp_sp_memoryusage.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Tp Sp Memoryusage](/ultra-scale-book/fragments/tp_sp_memoryusage.html)*
-
 We've again strongly reduced the maximum memory usage per GPU, allowing us to fit sequence lengths of 16k tokens with TP+SP=16 - an improvement over the vanilla TP case! (TP=16 is still a bit large, as we saw in the previous section, but we'll see how we can improve this in the next section.)
 
 One question you may be asking yourself is whether using TP+SP incurs more communication overhead than vanilla TP. Well, yes and no. In the forward pass with vanilla TP we had two all-reduce operations per transformer block, and in SP we have two all-gather and two reduce-scatter operations per transformer block. So, SP does twice the number of communication operations as TP. But since an all-reduce operation can be broken down into an all-gather and a reduce-scatter (see the ["Ring AllReduce"](#a_quick_focus_on_ring_allreduce) section in the appendix), they’re actually equivalent in terms of communication cost. The same reasoning applies for the backward pass, as we just use the conjugate of each operation (no-op ↔ allreduce and allgather ↔ reducescatter).
 
 If you’ve been paying close attention, you’ll notice that we’re talking about four communication operations in each layer (two for attention and two for MLP). This is what the MLP profiling looks like when using TP+SP:
 
-![tp_sp_overlap.svg](assets/images/tp_sp_overlap.svg)
-
 Just like vanilla TP, TP+SP can’t easily be overlapped with compute, which makes throughput heavily dependent on the communication bandwidth. Here again, like vanilla TP, TP+SP is usually done only within a node (keeping the TP degree under the number of GPUs per node; e.g., TP≤8).
 
 We can benchmark how this communication overhead becomes increasingly problematic as we scale up tensor parallelism. Let’s measure the throughput and memory utilization as we scale TP with SP for a 3B parameter model with a sequence length of 4,096:
-
-<iframe src="/ultra-scale-book/fragments/tp_sp_scaling.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
-
-*[Open full interactive visualization: Tp Sp Scaling](/ultra-scale-book/fragments/tp_sp_scaling.html)*
 
 Again, there's a trade-off between computational efficiency (left) and memory capacity (right). While higher degrees of parallelism enable processing of significantly larger batch sizes by reducing the activation memory, they also reduce per-GPU throughput, in particular above a threshold corresponding to the number of GPUs per node.
 
