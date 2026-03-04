@@ -8,7 +8,7 @@ With tensor parallelism + sequence parallelism, we can reduce the memory require
 
 Moreover, even if we use full recomputation of the activations (which incurs a heavy compute overhead of ~30%), we still need to hold in memory some activations at the layer boundaries, which scale linearly with sequence length. Let's take a look and see how context parallelism (CP) can help us:
 
-> **[📊 Interactive Visualization: Cp 8Bmemoryusage](fragments/cp_8Bmemoryusage.html)**
+> **[📊 Interactive Visualization: Cp 8Bmemoryusage](/ultra-scale-book/fragments/cp_8Bmemoryusage.html)**
 
 The core idea of context parallelism is similar to sequence parallelism (i.e., splitting along the sequence length), but this approach is applied to the modules where we already apply tensor parallelism. We will thus split these modules along two dimensions, thereby also reducing the effect of sequence length. You should find this approach quite intuitive after all we’ve already covered, but there's a trick to it, so stay awake!
 
@@ -40,13 +40,13 @@ We perform these three steps four times to complete the attention calculation.
 
 The whole process with four GPUs is shown in the following animation:
 
-![ring-attention.gif](assets/images/ring-attention.gif)
+![ring-attention.gif](/ultra-scale-book/assets/images/ring-attention.gif)
 
 It's probably obvious to you from this animation why the authors chose to call this approach Ring Attention[]!
 
 There is one big problem, though, which is that a naive implementation of Ring Attention leads to some strong imbalances between GPUs due to the shape of the causal attention matrix. Let’s take a look at the softmax computation by considering the attention score matrix with the causal attention mask:
 
-![cp_attnmask.svg](assets/images/cp_attnmask.svg)
+![cp_attnmask.svg](/ultra-scale-book/assets/images/cp_attnmask.svg)
 
 The softmax is computed row-wise, which means whenever a GPU has received all the tokens of a row, it can be computed. We see that GPU 1 can immediately compute it, as it starts with tokens 1-4 and doesn’t need to receive any information from any other GPUs. However, GPU 2 will need to wait for the second round to receive tokens 1-4 and thus have all the values for tokens 1-8. GPU 1 also seems to perform much less work than all the other GPUs.
 
@@ -58,15 +58,15 @@ We need a better way to distribute the input sequences. This can be achieved by 
 
 We show here Zig-Zag Attention, which slightly differs from Striped Attention[]. For details on the differences, check [this GitHub discussion](https://github.com/zhuzilin/ring-flash-attention/issues/2#issuecomment-2236746166).
 
-![cp_zigzagmask.svg](assets/images/cp_zigzagmask.svg)
+![cp_zigzagmask.svg](/ultra-scale-book/assets/images/cp_zigzagmask.svg)
 
 You’ll also see that in order to complete all rows, each GPU will need information from all the other GPUs.
 
 We have two general ways to overlap computation and communication: either by performing a general all-gather, regrouping all the keys and values on each GPU at the same time (in a ZeRO-3 type of way), or by gathering them from each GPU on each GPU as needed.
 
-![cp_overlap_allgather.svg](assets/images/cp_overlap_allgather.svg)
+![cp_overlap_allgather.svg](/ultra-scale-book/assets/images/cp_overlap_allgather.svg)
 
-![cp_overlap_all2all.svg](assets/images/cp_overlap_all2all.svg)
+![cp_overlap_all2all.svg](/ultra-scale-book/assets/images/cp_overlap_all2all.svg)
 
 The key differences between these two implementations lie in their communication patterns and memory usage:
 

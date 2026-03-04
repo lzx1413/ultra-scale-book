@@ -76,7 +76,7 @@ Now let's take a step back to gather and analyze the results of all our benchmar
 
 All the following benchmarks were conducted with a sequence length of 4,096 and a global batch size of 1M tokens. We gathered all the top configurations for each model and cluster size and plotted them in the following heatmaps:
 
-![image.png](assets/images/what_we_learnt_heatmap.svg)
+![image.png](/ultra-scale-book/assets/images/what_we_learnt_heatmap.svg)
 
 Heatmap visualization showing the optimal training configurations across different model sizes and compute node counts (we have 8 GPUs per node). For each combination, the configuration details include data parallelism (DP), tensor parallelism (TP), pipeline parallelism (PP), gradient accumulation steps (GAS), micro-batch size (MBS), and ZeRO optimization stage. The color intensity indicates the model FLOPs utilization (MFU), with brighter colors representing higher efficiency.
 
