@@ -62,9 +62,9 @@ So how can you quickly determine memory usage from these variables? One simple w
 
 Using the PyTorch profiler, we can understand how memory is allocated throughout training. We can see that memory utilization is not a static thing, but varies widely during training and during a training step:
 
-<iframe src="fragments/memory-profile.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+<iframe src="/ultra-scale-book/fragments/memory-profile.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
 
-*[Open full interactive visualization: Memory-Profile](fragments/memory-profile.html)*
+*[Open full interactive visualization: Memory-Profile](/ultra-scale-book/fragments/memory-profile.html)*
 
 Clearly the first step looks very different from the subsequent ones, but before we get to that, let’s take a look at the general anatomy of a step. First the activations increase quickly as we do the forward pass, then during the backward pass the gradients build up, and as the backward pass propagates, the stored activations used to compute the gradients are progressively cleared. Finally, we perform optimization, during which we need all the gradients, and then update the optimizer states before we start the next forward pass.
 
@@ -138,9 +138,9 @@ For the exact derivation of the numbers, you can follow the original NVIDIA pape
 
 An interesting observation here is that memory usage is not static for a given model; rather, it scales linearly with the batch size and quadratically with the sequence length. This means the activation memory is the part that will blow up when we increase our batch size or train with longer sequences. We can use this equation to look at how memory usage changes for various sequence lengths, for example for Llama models (`bs=1`):
 
-<iframe src="fragments/memusage_activations.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+<iframe src="/ultra-scale-book/fragments/memusage_activations.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
 
-*[Open full interactive visualization: Memusage Activations](fragments/memusage_activations.html)*
+*[Open full interactive visualization: Memusage Activations](/ultra-scale-book/fragments/memusage_activations.html)*
 
 These graphs tell a striking story: for short sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 2-4k tokens they start to take up a significant amount of memory, while usage for parameters, gradients, and optimizer states (as we’ll discuss later) is roughly independent of the sequence length and batch size.
 
@@ -161,9 +161,9 @@ There are a few strategies for selecting key activations to store:
 
 Let’s see how drastically recomputation strategies can reduce the memory footprint in practice, and how selective recomputation strikes a nice balance between memory savings and recomputation cost:
 
-<iframe src="fragments/memory-recomputation.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
+<iframe src="/ultra-scale-book/fragments/memory-recomputation.html" width="100%" height="450" frameborder="0" scrolling="no"></iframe>
 
-*[Open full interactive visualization: Memory-Recomputation](fragments/memory-recomputation.html)*
+*[Open full interactive visualization: Memory-Recomputation](/ultra-scale-book/fragments/memory-recomputation.html)*
 
 Another trend that's clearly visible here is how the activations for long sequences play a bigger role for smaller models, so the effect of recomputation becomes even more noticeable.
 
