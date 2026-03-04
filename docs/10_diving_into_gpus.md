@@ -284,9 +284,9 @@ We know that instability increases as learning rates rise for a fixed model size
 
 Here is an example of a typically divergent loss curve for FP8 training:
 
-> **[📊 Interactive Visualization: Fp8 Training Loss Curves](assets/data/fp8/fp8_training_loss_curves.html)**
+> **[📊 Interactive Visualization: Fp8 Training Loss Curves](fragments/fp8_training_loss_curves.html)**
 
-*[Open interactive visualization](assets/data/fp8/fp8_training_loss_curves.html)*
+*[Open interactive visualization](fragments/fp8_training_loss_curves.html)*
 
 The first successful very large scale training with FP8 mixed precision was publicly reported in the DeepSeek-V3 technical report[]. The authors carefully analyzed each operation of the forward pass (*Fprop*) as well as the activation (*Dgrad*) and weight (*Wgrad*) backward passes. Similar to BF16 mixed precision training, some aggregations and master weights are kept in higher precision while the operations themselves are performed in FP8.
 
