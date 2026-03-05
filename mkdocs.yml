@@ -42,6 +42,7 @@ nav:
   - "11. Conclusion": 11_conclusion.md
   - "12. References": 12_references.md
   - "13. Appendix": 13_appendix.md
+  - "14. Appendix: SM90 to SM100 Porting Guide": 14_appendix_sm100_porting.md
 
 markdown_extensions:
   - pymdownx.highlight
